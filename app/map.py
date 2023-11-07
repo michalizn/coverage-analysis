@@ -252,11 +252,11 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                 i = 0
                 for log in meas_data:
 ###############################################################  
-                    latid_rsrp.append(float(log.split(",")[2]))
-                    lontid_rsrp.append(float(log.split(",")[4]))
-                    name_rsrp.append(str(log.split(",")[12]))
-                    cellid.append(int(log.split(",")[18]))
-                    rsrp_value = int(log.split(",")[24])
+                    latid_rsrp.append(float(log.split(",")[17]))
+                    lontid_rsrp.append(float(log.split(",")[19]))
+                    name_rsrp.append(str(log.split(",")[3]))
+                    cellid.append(int(log.split(",")[7]))
+                    rsrp_value = int(log.split(",")[13])
                     rsrp.append(rsrp_value)
                     if rsrp_value >= -80:
                         color_rsrp.append('lawngreen')
@@ -269,10 +269,10 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                     else:
                         color_rsrp.append('white')
 ###############################################################  
-                    latid_rsrq.append(float(log.split(",")[2]))
-                    lontid_rsrq.append(float(log.split(",")[4]))
-                    name_rsrq.append(str(log.split(",")[12]))
-                    rsrq_value = float(log.split(",")[25])/100
+                    latid_rsrq.append(float(log.split(",")[17]))
+                    lontid_rsrq.append(float(log.split(",")[19]))
+                    name_rsrq.append(str(log.split(",")[3]))
+                    rsrq_value = float(log.split(",")[14])/100
                     rsrq.append(rsrq_value)
                     if rsrq_value >= -10:
                         color_rsrq.append('lawngreen')
@@ -285,10 +285,10 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                     else:
                         color_rsrq.append('white')
 ###############################################################  
-                    latid_sinr.append(float(log.split(",")[2]))
-                    lontid_sinr.append(float(log.split(",")[4]))
-                    name_sinr.append(str(log.split(",")[12]))
-                    sinr_value = float(log.split(",")[26])/100
+                    latid_sinr.append(float(log.split(",")[17]))
+                    lontid_sinr.append(float(log.split(",")[19]))
+                    name_sinr.append(str(log.split(",")[3]))
+                    sinr_value = float(log.split(",")[15])/100
                     sinr.append(sinr_value)
                     if sinr_value >= 20:
                         color_sinr.append('lawngreen')
@@ -304,7 +304,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                     # band.append(str(log.split(",")[20]))
                     # rat.append(str(log.split(",")[14]).split(" ")[1])
                     # operator.append(str(log.split(",")[12].replace("\"", "")))
-                    time.append(log.split(",")[1].replace("+08\"", ''))
+                    time.append(log.split(",")[1])
                     i += 1
                 initial_lat = latid_rsrp[-1]
                 initial_lon = lontid_rsrp[-1]
@@ -663,9 +663,9 @@ def update_selectors_options(selected_file):
                 meas_data = meas_data.readlines()
                 for log in meas_data:                  
 ###############################################################
-                    band.append(str(log.split(",")[20]))
-                    rat.append(str(log.split(",")[14]).split(" ")[1])
-                    operator.append(str(log.split(",")[12].replace("\"", "")))
+                    band.append(str(log.split(",")[9]))
+                    rat.append(str(log.split(",")[3]))
+                    operator.append(str(log.split(",")[4]))         #TODO change to operator name
 ###############################################################
         band_options = list(set(band))
         rat_options = list(set(rat))
