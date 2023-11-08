@@ -1,5 +1,6 @@
 import os
 import glob
+import time
 import random
 import webbrowser
 import pandas as pd
@@ -21,79 +22,102 @@ from scipy.interpolate import griddata
 from scipy.interpolate import LinearNDInterpolator, CloughTocher2DInterpolator
 from matplotlib import colors as mpl_colors
 import socket
-# def calculate_distance_between_coordinates(lat1, lon1, lat2, lon2):
-#     # approximate radius of Earth in kilometers
-#     R = 6371.0
+###############################################################
+def calculate_cumulative_distance(latitudes, longitudes):
+    distance = 0.0
 
-#     # convert degrees to radians
-#     lat1 = radians(lat1)
-#     lon1 = radians(lon1)
-#     lat2 = radians(lat2)
-#     lon2 = radians(lon2)
+    # iterate over the coordinates
+    for i in range(len(latitudes) - 1):
+        lat1, lon1 = latitudes[i], longitudes[i]
+        lat2, lon2 = latitudes[i+1], longitudes[i+1]
 
-#     # calculate the differences of the coordinates
-#     dlon = lon2 - lon1
-#     dlat = lat2 - lat1
+        # calculate the distance between neighboring coordinates
+        segment_distance = calculate_distance_between_coordinates(lat1, lon1, lat2, lon2)
 
-#     # apply the Haversine formula
-#     a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
-#     c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        # add the segment distance to the cumulative distance
+        distance += segment_distance
 
-#     # calculate the distance
-#     distance = R * c
-#     return distance
+    return distance
 
-# def calculate_cumulative_distance(latitudes, longitudes):
-#     distance = 0.0
+def all_values_greater_than(lst, value):
+    return all(x > value for x in lst)
+###############################################################
+def calculate_distance_between_coordinates(lat1, lon1, lat2, lon2):
+    # approximate radius of Earth in kilometers
+    R = 6371.0
 
-#     # iterate over the coordinates
-#     for i in range(len(latitudes) - 1):
-#         lat1, lon1 = latitudes[i], longitudes[i]
-#         lat2, lon2 = latitudes[i+1], longitudes[i+1]
+    # convert degrees to radians
+    lat1 = radians(lat1)
+    lon1 = radians(lon1)
+    lat2 = radians(lat2)
+    lon2 = radians(lon2)
 
-#         # calculate the distance between neighboring coordinates
-#         segment_distance = calculate_distance_between_coordinates(lat1, lon1, lat2, lon2)
+    # calculate the differences of the coordinates
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
 
-#         # add the segment distance to the cumulative distance
-#         distance += segment_distance
+    # apply the Haversine formula
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
 
-#     return distance
+    # calculate the distance
+    distance = R * c
+    return distance
+###############################################################
+# Define a function to map values to colors based on input column
+def map_column_to_color(df, column_name):
+    if column_name == 'rsrp':
+        thresholds = [-80, -90, -100]
+        colors = ['lawngreen', 'yellow', 'orange', 'red']
+    elif column_name == 'rsrq':
+        thresholds = [-10, -15, -20]
+        colors = ['lawngreen', 'yellow', 'orange', 'red']
+    elif column_name == 'rssi':
+        thresholds = [-65, -75, -85]
+        colors = ['lawngreen', 'yellow', 'orange', 'red']
+    elif column_name == 'rssnr':
+        thresholds = [10, 3, 0]
+        colors = ['lawngreen', 'yellow', 'orange', 'red']
+    else:
+        raise ValueError("Invalid column name")
 
-# def all_values_greater_than(lst, value):
-#     return all(x > value for x in lst)
+    def map_value_to_color(value):
+        for i in range(len(thresholds)):
+            if value >= thresholds[i]:
+                return colors[i]
+        return colors[-1]  # Default color for values below the lowest threshold
 
-latid_cell = []
-lontid_cell = []
-name_cell = []
-cellid = []
-latid_rsrp = []
-lontid_rsrp = []
-rsrp = []
-color_rsrp = []
-name_rsrp = []
-latid_rsrq = []
-lontid_rsrq = []
-rsrq = []
-color_rsrq = []
-name_rsrq = []
-latid_sinr = []
-lontid_sinr = []
-sinr = []
-color_sinr = []
-name_sinr = []
-band = []
-operator = []
-rat = []
-time = []
-distance = []
+    df[f'color_{column_name}'] = df[column_name].apply(map_value_to_color)
 ###############################################################
 # Initialize dataframe of Cells
-df_bts = pd.read_csv(r'/home/baranekm/Documents/Python/5G_module/additional_data/bts_list.csv', delimiter=';')
+bts_df = pd.read_csv(r'/home/baranekm/Documents/Python/5G_module/additional_data/bts_list.csv', delimiter=';')
+# Formating to display multiple columns in the text while hovering over the points in the map
+bts_df['text'] = 'Node place: ' + bts_df['bts_place'].astype(str) + '<br>' + \
+                 'Latitude: ' + bts_df['bts_lat'].astype(str) + '<br>' + \
+                 'Lontitude: ' + bts_df['bts_lon'].astype(str) + '<br>' + \
+                 'Cell ID: ' + bts_df['hex'].astype(str)
+# Clean 'hex' column by removing non-numeric characters
+bts_df['hex'] = bts_df['hex'].str.replace(r'\D', '', regex=True)
+# Convert 'hex' column to numeric, coerce non-numeric values to NaN
+bts_df['hex'] = pd.to_numeric(bts_df['hex'], errors='coerce')
 # Define the directory where your .txt files are located
 data_directory = r'/home/baranekm/Documents/Python/5G_module/measured_data'
 # Initialize a State variable to store the previous selected file and method
 prev_selected_file = None
+prev_selected_file_2 = None
 prev_selected_method = None
+# Initialize a options lists to store the unique values from dataframe
+band = []
+operator = []
+rat = []
+# Define column names
+meas_column_names = ['date', 'time', 'csq', 'rat', 'operation_mode', 'mobile_country_code', 'location_area_code',
+                     'cell_id', 'arfcn', 'band', 'downlink_frequency', 'downlink_bandwidth', 'uplink_bandwidth',
+                     'rsrp', 'rsrq', 'rssi', 'rssnr', 'latitude', 'ns_indicator', 'longitude', 'ew_ndicator',
+                     'date2', 'time2', 'altitude', 'speed', 'course', 'color_rsrp', 'color_rsrq', 'color_rssi',
+                     'color_rssnr', 'text']
+# Define the main dataframe
+meas_df = pd.DataFrame(columns=meas_column_names)
 ###############################################################
 # Create the map layout
 map_layout = go.Layout(
@@ -121,7 +145,7 @@ app.layout = html.Div([
             id='data-selector',
             options=[
                 {'label': f'Data Set {i}', 'value': file_path}
-                for i, file_path in enumerate(glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.txt'), start=1)
+                for i, file_path in enumerate(glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv'), start=1)
             ],
             placeholder="Select a data set..."
         ),
@@ -194,9 +218,6 @@ app.layout = html.Div([
      Output('rsrq-chart', 'figure'), 
      Output('sinr-chart', 'figure'), 
      Output('map', 'figure')
-    #  Output('band-selector', 'options'),
-    #  Output('rat-selector', 'options'),
-    #  Output('operator-selector', 'options')
     ],
     [Input('data-selector', 'value'), 
      Input('interpolation-selector', 'value'), 
@@ -214,123 +235,61 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
     initial_lon = 0
     global prev_selected_file  # Use the global keyword to update the previous selected file
     global prev_selected_method  # Use the global keyword to update the previous selected method
+    global meas_df
 ###############################################################
     if selected_file != prev_selected_file or selected_method != prev_selected_method:
         map_figure['data'] = []
-        latid_cell.clear()
-        lontid_cell.clear()
-        name_cell.clear()
-        cellid.clear()
-###############################################################        
-        latid_rsrp.clear()
-        lontid_rsrp.clear()
-        rsrp.clear()
-        color_rsrp.clear()
-        name_rsrp.clear()
-###############################################################
-        latid_rsrq.clear()
-        lontid_rsrq.clear()
-        rsrq.clear()
-        color_rsrq.clear()
-        name_rsrq.clear()
-###############################################################
-        latid_sinr.clear()
-        lontid_sinr.clear()
-        sinr.clear()
-        color_sinr.clear()
-        name_sinr.clear()
-###############################################################
-        # band.clear()
-        # operator.clear()
-        # rat.clear()
-        time.clear()
-        distance.clear()
 ###############################################################
         if selected_file != None:
-            with open(selected_file, mode="r", encoding="utf-8") as meas_data:
-                meas_data = meas_data.readlines()
-                i = 0
-                for log in meas_data:
-###############################################################  
-                    latid_rsrp.append(float(log.split(",")[17]))
-                    lontid_rsrp.append(float(log.split(",")[19]))
-                    name_rsrp.append(str(log.split(",")[3]))
-                    cellid.append(int(log.split(",")[7]))
-                    rsrp_value = int(log.split(",")[13])
-                    rsrp.append(rsrp_value)
-                    if rsrp_value >= -80:
-                        color_rsrp.append('lawngreen')
-                    elif rsrp_value < -80 and rsrp_value >= -90:
-                        color_rsrp.append('yellow')
-                    elif rsrp_value < -90 and rsrp_value >= -100:
-                        color_rsrp.append('orange')
-                    elif rsrp_value < -100 :
-                        color_rsrp.append('red')
-                    else:
-                        color_rsrp.append('white')
-###############################################################  
-                    latid_rsrq.append(float(log.split(",")[17]))
-                    lontid_rsrq.append(float(log.split(",")[19]))
-                    name_rsrq.append(str(log.split(",")[3]))
-                    rsrq_value = float(log.split(",")[14])/100
-                    rsrq.append(rsrq_value)
-                    if rsrq_value >= -10:
-                        color_rsrq.append('lawngreen')
-                    elif rsrq_value < -10 and rsrq_value >= -15:
-                        color_rsrq.append('yellow')
-                    elif rsrq_value < -15 and rsrq_value >= -20:
-                        color_rsrq.append('orange')
-                    elif rsrq_value < -20 :
-                        color_rsrq.append('red')
-                    else:
-                        color_rsrq.append('white')
-###############################################################  
-                    latid_sinr.append(float(log.split(",")[17]))
-                    lontid_sinr.append(float(log.split(",")[19]))
-                    name_sinr.append(str(log.split(",")[3]))
-                    sinr_value = float(log.split(",")[15])/100
-                    sinr.append(sinr_value)
-                    if sinr_value >= 20:
-                        color_sinr.append('lawngreen')
-                    elif sinr_value < 20 and sinr_value >= 13:
-                        color_sinr.append('yellow')
-                    elif sinr_value < 13 and sinr_value >= 0:
-                        color_sinr.append('orange')
-                    elif sinr_value < 0:
-                        color_sinr.append('red')
-                    else:
-                        color_sinr.append('white')
-###############################################################  
-                    # band.append(str(log.split(",")[20]))
-                    # rat.append(str(log.split(",")[14]).split(" ")[1])
-                    # operator.append(str(log.split(",")[12].replace("\"", "")))
-                    time.append(log.split(",")[1])
-                    i += 1
-                initial_lat = latid_rsrp[-1]
-                initial_lon = lontid_rsrp[-1]
-###############################################################  
-            for row in df_bts.itertuples():
-                latid_cell.append(float(row[9]))
-                lontid_cell.append(float(row[10]))
-                name_cell.append(str(row[8]))
+            # Read the measurement .csv file
+            meas_df = pd.read_csv(selected_file, header=None, names=meas_column_names, delimiter=',')
+            # Merge the DataFrames on 'cell_id' column
+            meas_df = meas_df.merge(bts_df, left_on='cell_id', right_on='hex', how='left')
+            # Perform '/ 100' operation on the 'rsrq' column to get float values
+            meas_df['rsrq'] /= 100
+            # Perform '/ 10' operation on the 'rssi' column to get float values
+            meas_df['rssi'] /= 10
+            # Map 'rsrp' values to colors
+            map_column_to_color(meas_df, 'rsrp')
+            # Map 'rsrq' values to colors
+            map_column_to_color(meas_df, 'rsrq')
+            # Map 'rssi' values to colors
+            map_column_to_color(meas_df, 'rssi')
+            # Map 'rssnr' values to colors
+            map_column_to_color(meas_df, 'rssnr')
+            # Formating to display multiple columns in the text while hovering over the points in the map
+            meas_df['text'] = 'Meausered time: ' + meas_df['date'].astype(str) + ' ' + meas_df['time'].astype(str) + '<br>' + \
+                              'CSQ: ' + meas_df['csq'].astype(str) + '<br>' + \
+                              'RAT: ' + meas_df['rat'].astype(str) + '<br>' + \
+                              'Mobile Country Code: ' + meas_df['mobile_country_code'].astype(str) + '<br>' + \
+                              'Location Area Code: ' + meas_df['location_area_code'].astype(str) + '<br>' + \
+                              'Cell ID: ' + meas_df['cell_id'].astype(str) + '<br>' + \
+                              'ARFCN: ' + meas_df['arfcn'].astype(str) + '<br>' + \
+                              'Band: ' + meas_df['band'].astype(str) + '<br>' + \
+                              'DL Frequency: ' + meas_df['downlink_frequency'].astype(str) + ' MHz'  + '<br>' + \
+                              'DL Bandwidth: ' + meas_df['downlink_bandwidth'].astype(str) + ' MHz'  + '<br>' + \
+                              'UL Bandwidth: ' + meas_df['uplink_bandwidth'].astype(str) + ' MHz'  + '<br>' + \
+                              'RSRP: ' + meas_df['rsrp'].astype(str) + ' dBm' + '<br>' + \
+                              'RSRQ: ' + meas_df['rsrq'].astype(str) + ' dB'  + '<br>' + \
+                              'RSSI: ' + meas_df['rssi'].astype(str) + ' dBm'  + '<br>' + \
+                              'RSSNR: ' + meas_df['rssnr'].astype(str) + ' dB'
+            initial_lat = float(meas_df['latitude'].iloc[-1])
+            initial_lon = float(meas_df['longitude'].iloc[-1])
 ###############################################################
             if selected_method != None:
-                grid_x, grid_y = np.mgrid[min(latid_rsrp):max(latid_rsrp):100j, min(lontid_rsrp):max(lontid_rsrp):100j]
+                grid_x, grid_y = np.mgrid[min(meas_df['latitude']):max(meas_df['latitude']):100j, min(meas_df['longitude']):max(meas_df['longitude']):100j]
                 # Define the interpolation method based on the selected method
                 if selected_method == 'Linear Interpolation':
-                    grid_z = griddata((latid_rsrp, lontid_rsrp), rsrp, (grid_x, grid_y), method='linear')
+                    grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='linear')
                 elif selected_method == 'Nearest-Neighbor Interpolation':
-                    grid_z = griddata((latid_rsrp, lontid_rsrp), rsrp, (grid_x, grid_y), method='nearest')
+                    grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='nearest')
                 elif selected_method == 'Cubic Interpolation':
-                    grid_z = griddata((latid_rsrp, lontid_rsrp), rsrp, (grid_x, grid_y), method='cubic')
-                # elif selected_method == 'CloughTocher Interpolation':
-                #     interp = CloughTocher2DInterpolator(list(zip(latid_rsrp, lontid_rsrp)), rsrp)
-                #     grid_z = interp(grid_x, grid_y)
-
+                    grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='cubic')
+###############################################################
                 # Define RSRP thresholds and corresponding colors
                 rsrp_thresholds = [-80, -85, -90, -95, -100, -105]
                 colors = ['green', 'yellowgreen', 'yellow', 'orange', 'red', 'darkred']
-
+###############################################################
                 # Assign colors based on RSRP thresholds
                 colors_interpolated = []
                 opacities_interpolated = []
@@ -353,37 +312,37 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
 ###############################################################
             # Create Scattermapbox trace for measured RSRP points
             scatter_mapbox_trace_rsrp = go.Scattermapbox(
-                lat=latid_rsrp,
-                lon=lontid_rsrp,
+                lat=meas_df['latitude'],
+                lon=meas_df['longitude'],
                 mode='markers+lines',
-                marker=dict(size=10, symbol="circle", color=color_rsrp, opacity=1, colorscale='Viridis'),
+                marker=dict(size=10, symbol="circle", color=meas_df['color_rsrp'], opacity=1, colorscale='Viridis'),
                 line=dict(width=2, color='grey'),
-                text=name_rsrp,
+                text=meas_df['text'],
                 hoverinfo='text',
                 name='Measured RSRP Points'
             )
 ###############################################################
-            # Create Scattermapbox trace for measured RSRP points
+            # Create Scattermapbox trace for measured RSRQ points
             scatter_mapbox_trace_rsrq = go.Scattermapbox(
-                lat=latid_rsrq,
-                lon=lontid_rsrq,
+                lat=meas_df['latitude'],
+                lon=meas_df['longitude'],
                 mode='markers+lines',
-                marker=dict(size=10, symbol="circle", color=color_rsrq, opacity=1, colorscale='Viridis'),
+                marker=dict(size=10, symbol="circle", color=meas_df['color_rsrp'], opacity=1, colorscale='Viridis'),
                 line=dict(width=2, color='grey'),
-                text=name_rsrq,
+                text=meas_df['text'],
                 hoverinfo='text',
                 name='Measured RSRQ Points',
                 visible='legendonly'  # Set visibility to legendonly by default
             )
 ###############################################################
-            # Create Scattermapbox trace for measured RSRP points
+            # Create Scattermapbox trace for measured RSSNR points
             scatter_mapbox_trace_sinr = go.Scattermapbox(
-                lat=latid_sinr,
-                lon=lontid_sinr,
+                lat=meas_df['latitude'],
+                lon=meas_df['longitude'],
                 mode='markers+lines',
-                marker=dict(size=10, symbol="circle", color=color_sinr, opacity=1, colorscale='Viridis'),
+                marker=dict(size=10, symbol="circle", color=meas_df['color_rsrp'], opacity=1, colorscale='Viridis'),
                 line=dict(width=2, color='grey'),
-                text=name_sinr,
+                text=meas_df['text'],
                 hoverinfo='text',
                 name='Measured SINR Points',
                 visible='legendonly'  # Set visibility to legendonly by default
@@ -391,11 +350,11 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
 ###############################################################
             # Create Scattermapbox trace for Cell points
             scatter_mapbox_trace_cells = go.Scattermapbox(
-                lat=latid_cell,
-                lon=lontid_cell,
+                lat=bts_df['bts_lat'],
+                lon=bts_df['bts_lon'],
                 mode='markers',
                 marker=dict(size=20, symbol="circle", color='black', opacity=0.2),
-                text=name_cell,
+                text=bts_df['text'],
                 hoverinfo='text',
                 name='Cell towers'
             )
@@ -446,15 +405,9 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
     # Use dash.callback_context to determine which input triggered the callback
     ctx = dash.callback_context
 ###############################################################
-    # Data to be displayed
-    x = time
-    y_rsrp = rsrp
-    y_rsrq = rsrq
-    y_sinr = sinr
-###############################################################
     # Create a list to hold marker colors and opacity
-    marker_colors = ['blue'] * len(x)  # Initialize with the original color
-    marker_opacity = [0.5] * len(x)  # Initialize with the original opacity
+    marker_colors = ['blue'] * len(meas_df)  # Initialize with the original color
+    marker_opacity = [0.5] * len(meas_df)  # Initialize with the original opacity
 ###############################################################
     if ctx.triggered:
         trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
@@ -468,28 +421,25 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
             else:
                 index = 0
             # Highlight the selected point by changing its marker color
-            if index <= len(latid_rsrp):
+            if index <= len(meas_df):
                 marker_colors[index] = 'red'  # Change the color of the selected point
                 marker_opacity[index] = 1
-                lat = latid_rsrp[index]
-                lon = lontid_rsrp[index]
+                # lat = latid_rsrp[index]
+                # lon = lontid_rsrp[index]
+                lat = meas_df['latitude'].iloc[index]
+                lon = meas_df['longitude'].iloc[index]
             lat_bts = 0
             lon_bts = 0
 ###############################################################  
-            # Your logic for finding lat_bts and lon_bts goes here
-            for row in df_bts.itertuples():
-                try:
-                    if int(row[2]) == int(cellid[latid_rsrp.index(lat)]):
-                        lat_bts = row[9]
-                        lon_bts = row[10]
-                except:
-                    continue
+            # Logic for finding lat_bts and lon_bts goes here
+            matching_row = meas_df.loc[meas_df['latitude'] == lat]
+            lat_bts = matching_row['bts_lat'].values[0]
+            lon_bts = matching_row['bts_lon'].values[0]
 ###############################################################  
             if lat_bts and lon_bts != 0:
                 # Find and remove existing line_trace traces
                 to_remove = []
                 for i, trace in enumerate(map_figure['data']):
-                    #if 'lat' in trace and 'lon' in trace and trace.get('mode', '') == 'lines':
                     if 'lat' in trace and 'lon' in trace and trace['mode'] == 'lines':
                         to_remove.append(i)
 ###############################################################                 
@@ -503,7 +453,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                     mode='lines',
                     line=dict(width=2, color='darkblue'),
                     hoverinfo='none',
-                    name=name_rsrp[latid_rsrp.index(lat)]
+                    name="Connection line - distance: "  + str(round(calculate_distance_between_coordinates(lat, lon, lat_bts, lon_bts), 2)) + " km"
                 )
                 map_figure['data'].append(line_trace)
                 #map_figure.add_trace(line_trace)
@@ -511,28 +461,23 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
         elif trigger_id == 'map':
             index = map_click_data['points'][0]['pointIndex']
             # Highlight the selected point by changing its marker color
-            if index <= len(latid_rsrp):
+            if index <= len(meas_df):
                 marker_colors[index] = 'red'  # Change the color of the selected point
                 marker_opacity[index] = 1     # Change the opacity of the selected point
-                lat = latid_rsrp[index]
-                lon = lontid_rsrp[index]
+                lat = meas_df['latitude'].iloc[index]
+                lon = meas_df['longitude'].iloc[index]
             lat_bts = 0
             lon_bts = 0
 ###############################################################
-            # Your logic for finding lat_bts and lon_bts goes here
-            for row in df_bts.itertuples():
-                try:
-                    if int(row[2]) == int(cellid[latid_rsrp.index(lat)]):
-                        lat_bts = row[9]
-                        lon_bts = row[10]
-                except:
-                    continue
+            # Logic for finding lat_bts and lon_bts goes here
+            matching_row = meas_df.loc[meas_df['latitude'] == lat]
+            lat_bts = matching_row['bts_lat'].values[0]
+            lon_bts = matching_row['bts_lon'].values[0]
 ###############################################################
             if lat_bts and lon_bts != 0:
                 # Find and remove existing line_trace traces
                 to_remove = []
                 for i, trace in enumerate(map_figure['data']):
-                    #if 'lat' in trace and 'lon' in trace and trace.get('mode', '') == 'lines':
                     if 'lat' in trace and 'lon' in trace and trace['mode'] == 'lines':
                         to_remove.append(i)
 ###############################################################
@@ -546,15 +491,15 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                     mode='lines',
                     line=dict(width=2, color='darkblue'),
                     hoverinfo='none',
-                    name=name_rsrp[latid_rsrp.index(lat)]
+                    name="Connection line - distance: " + str(round(calculate_distance_between_coordinates(lat, lon, lat_bts, lon_bts), 2)) + " km"
                 )
                 map_figure['data'].append(line_trace)
                 #map_figure.add_trace(line_trace)
 ###############################################################
     # Create the line trace with updated marker colors
     line_trace_rsrp = go.Scatter(
-        x=x,
-        y=y_rsrp,
+        x=meas_df['time'],
+        y=meas_df['rsrp'],
         mode='lines+markers',  # Display lines and markers
         line=dict(width=2, color='blue'),
         marker=dict(
@@ -574,8 +519,8 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
 ###############################################################
     # Create the line trace with updated marker colors
     line_trace_rsrq = go.Scatter(
-        x=x,
-        y=y_rsrq,
+        x=meas_df['time'],
+        y=meas_df['rsrq'],
         mode='lines+markers',  # Display lines and markers
         line=dict(width=2, color='blue'),
         marker=dict(
@@ -595,8 +540,8 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
 ###############################################################
     # Create the line trace with updated marker colors
     line_trace_sinr = go.Scatter(
-        x=x,
-        y=y_sinr,
+        x=meas_df['time'],
+        y=meas_df['rssnr'],
         mode='lines+markers',  # Display lines and markers
         line=dict(width=2, color='blue'),
         marker=dict(
@@ -605,13 +550,13 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
             color=marker_colors,  # Set marker colors
             symbol='square',
         ),
-        name='SINR',
+        name='RSSNR',
     )
     # Create the line chart layout (you can customize this)
     line_layout_sinr = go.Layout(
-        title='SINR',
+        title='RSSNR',
         xaxis=dict(title='time', tickangle=45),
-        yaxis=dict(title='SINR (dB)'),
+        yaxis=dict(title='RSSNR (dB)'),
     )
 ###############################################################
     # Create the figure and add the scatter mapbox trace
@@ -647,33 +592,21 @@ def update_selectors_availability(selected_file):
     [Input('data-selector', 'value')]
 )
 def update_selectors_options(selected_file):
-    global prev_selected_file
+    global prev_selected_file_2
     interpolation_methods = []
 ###############################################################
     # Check if a data are selected
-    if selected_file != prev_selected_file:
-        band.clear()
-        operator.clear()
-        rat.clear()
+    if selected_file != prev_selected_file_2:
 ###############################################################
         if selected_file != None:
             # Initialize a methods for interpolation
             interpolation_methods = ['Linear Interpolation', 'Nearest-Neighbor Interpolation', 'Cubic Interpolation']
-            with open(selected_file, mode="r", encoding="utf-8") as meas_data:
-                meas_data = meas_data.readlines()
-                for log in meas_data:                  
+            # Make a delay between execution of two callbacks
+            time.sleep(0.4)
 ###############################################################
-                    band.append(str(log.split(",")[9]))
-                    rat.append(str(log.split(",")[3]))
-                    operator.append(str(log.split(",")[4]))         #TODO change to operator name
-###############################################################
-        band_options = list(set(band))
-        rat_options = list(set(rat))
-        operator_options = list(set(operator))
-###############################################################
-        prev_selected_file = selected_file  # Update the previous selected file
+        prev_selected_file_2 = selected_file  # Update the previous selected file
         # Update options based on the selected rat 
-        return band_options, rat_options, operator_options, interpolation_methods
+        return list(meas_df['band'].unique()), list(meas_df['rat'].unique()), list(meas_df['mobile_country_code'].unique()), interpolation_methods
     else:
         # If no data are selected, return empty options for other selectors
         return [], [], [], []
