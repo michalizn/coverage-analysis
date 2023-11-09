@@ -94,7 +94,7 @@ bts_df = pd.read_csv(r'/home/baranekm/Documents/Python/5G_module/additional_data
 # Formating to display multiple columns in the text while hovering over the points in the map
 bts_df['text'] = 'Node place: ' + bts_df['bts_place'].astype(str) + '<br>' + \
                  'Latitude: ' + bts_df['bts_lat'].astype(str) + '<br>' + \
-                 'Lontitude: ' + bts_df['bts_lon'].astype(str) + '<br>' + \
+                 'Longitude: ' + bts_df['bts_lon'].astype(str) + '<br>' + \
                  'Cell ID: ' + bts_df['hex'].astype(str)
 # Clean 'hex' column by removing non-numeric characters
 bts_df['hex'] = bts_df['hex'].str.replace(r'\D', '', regex=True)
@@ -106,10 +106,6 @@ data_directory = r'/home/baranekm/Documents/Python/5G_module/measured_data'
 prev_selected_file = None
 prev_selected_file_2 = None
 prev_selected_method = None
-# Initialize a options lists to store the unique values from dataframe
-band = []
-operator = []
-rat = []
 # Define column names
 meas_column_names = ['date', 'time', 'csq', 'rat', 'operation_mode', 'mobile_country_code', 'location_area_code',
                      'cell_id', 'arfcn', 'band', 'downlink_frequency', 'downlink_bandwidth', 'uplink_bandwidth',
@@ -344,7 +340,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                 line=dict(width=2, color='grey'),
                 text=meas_df['text'],
                 hoverinfo='text',
-                name='Measured SINR Points',
+                name='Measured RSSNR Points',
                 visible='legendonly'  # Set visibility to legendonly by default
             )
 ###############################################################
@@ -431,7 +427,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
             lat_bts = 0
             lon_bts = 0
 ###############################################################  
-            # Logic for finding lat_bts and lon_bts goes here
+            # Logic for finding lat_bts and lon_bts
             matching_row = meas_df.loc[meas_df['latitude'] == lat]
             lat_bts = matching_row['bts_lat'].values[0]
             lon_bts = matching_row['bts_lon'].values[0]
@@ -469,7 +465,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
             lat_bts = 0
             lon_bts = 0
 ###############################################################
-            # Logic for finding lat_bts and lon_bts goes here
+            # Logic for finding lat_bts and lon_bts
             matching_row = meas_df.loc[meas_df['latitude'] == lat]
             lat_bts = matching_row['bts_lat'].values[0]
             lon_bts = matching_row['bts_lon'].values[0]
@@ -510,7 +506,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
         ),
         name='RSRP',
     )
-    # Create the line chart layout (you can customize this)
+    # Create the line chart layout
     line_layout_rsrp = go.Layout(
         title='RSRP',
         xaxis=dict(title='time', tickangle=45),
@@ -531,7 +527,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
         ),
         name='RSRQ',
     )
-    # Create the line chart layout (you can customize this)
+    # Create the line chart layout
     line_layout_rsrq = go.Layout(
         title='RSRQ',
         xaxis=dict(title='time', tickangle=45),
@@ -552,7 +548,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
         ),
         name='RSSNR',
     )
-    # Create the line chart layout (you can customize this)
+    # Create the line chart layout
     line_layout_sinr = go.Layout(
         title='RSSNR',
         xaxis=dict(title='time', tickangle=45),
@@ -601,7 +597,7 @@ def update_selectors_options(selected_file):
         if selected_file != None:
             # Initialize a methods for interpolation
             interpolation_methods = ['Linear Interpolation', 'Nearest-Neighbor Interpolation', 'Cubic Interpolation']
-            # Make a delay between execution of two callbacks
+            # Make a delay between execution of two callbacks for filling up the unique values into selectors
             time.sleep(0.4)
 ###############################################################
         prev_selected_file_2 = selected_file  # Update the previous selected file
