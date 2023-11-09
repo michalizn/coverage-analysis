@@ -94,7 +94,7 @@ bts_df = pd.read_csv(r'/home/baranekm/Documents/Python/5G_module/additional_data
 # Formating to display multiple columns in the text while hovering over the points in the map
 bts_df['text'] = 'Node place: ' + bts_df['bts_place'].astype(str) + '<br>' + \
                  'Latitude: ' + bts_df['bts_lat'].astype(str) + '<br>' + \
-                 'Longitude: ' + bts_df['bts_lon'].astype(str) + '<br>' + \
+                 'Lontitude: ' + bts_df['bts_lon'].astype(str) + '<br>' + \
                  'Cell ID: ' + bts_df['hex'].astype(str)
 # Clean 'hex' column by removing non-numeric characters
 bts_df['hex'] = bts_df['hex'].str.replace(r'\D', '', regex=True)
@@ -106,6 +106,9 @@ data_directory = r'/home/baranekm/Documents/Python/5G_module/measured_data'
 prev_selected_file = None
 prev_selected_file_2 = None
 prev_selected_method = None
+prev_selected_band = None
+prev_selected_rat = None
+prev_selected_operator = None 
 # Define column names
 meas_column_names = ['date', 'time', 'csq', 'rat', 'operation_mode', 'mobile_country_code', 'location_area_code',
                      'cell_id', 'arfcn', 'band', 'downlink_frequency', 'downlink_bandwidth', 'uplink_bandwidth',
@@ -140,9 +143,12 @@ app.layout = html.Div([
         dcc.Dropdown(
             id='data-selector',
             options=[
-                {'label': f'Data Set {i}', 'value': file_path}
-                for i, file_path in enumerate(glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv'), start=1)
+                # {'label': f'Data Set {i}', 'value': file_path}
+                # for i, file_path in enumerate(glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv'), start=1)
+                {'label': f'Data Set: {file_name}', 'value': file_path}
+                for file_name, file_path in zip([os.path.basename(file_path) for file_path in glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv')], glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv'))
             ],
+            multi=True,  # Allow multiple selection
             placeholder="Select a data set..."
         ),
 ###############################################################
@@ -216,7 +222,10 @@ app.layout = html.Div([
      Output('map', 'figure')
     ],
     [Input('data-selector', 'value'), 
-     Input('interpolation-selector', 'value'), 
+     Input('interpolation-selector', 'value'),
+     Input('band-selector', 'value'),
+     Input('rat-selector', 'value'),
+     Input('operator-selector', 'value'),
      Input('rsrp-chart', 'clickData'), 
      Input('rsrq-chart', 'clickData'), 
      Input('sinr-chart', 'clickData'), 
@@ -226,21 +235,27 @@ app.layout = html.Div([
      State('sinr-chart', 'figure'), 
      State('map', 'figure')]
 )
-def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_data, sinr_click_data, map_click_data, rsrp_figure, rsrq_figure, sinr_figure, map_figure):
+def update_charts(selected_file, selected_method, selected_band, seleceted_rat, selected_operator, rsrp_click_data, rsrq_click_data, sinr_click_data, map_click_data, rsrp_figure, rsrq_figure, sinr_figure, map_figure):
     initial_lat = 0
     initial_lon = 0
     global prev_selected_file  # Use the global keyword to update the previous selected file
     global prev_selected_method  # Use the global keyword to update the previous selected method
+    global prev_selected_band  # Use the global keyword to update the previous selected method
+    global prev_selected_rat  # Use the global keyword to update the previous selected method
+    global prev_selected_operator  # Use the global keyword to update the previous selected method
     global meas_df
 ###############################################################
-    if selected_file != prev_selected_file or selected_method != prev_selected_method:
+    if selected_file != prev_selected_file or selected_method != prev_selected_method or selected_band != prev_selected_band or seleceted_rat != prev_selected_rat or selected_operator != prev_selected_operator:
         map_figure['data'] = []
 ###############################################################
         if selected_file != None:
-            # Read the measurement .csv file
-            meas_df = pd.read_csv(selected_file, header=None, names=meas_column_names, delimiter=',')
-            # Merge the DataFrames on 'cell_id' column
-            meas_df = meas_df.merge(bts_df, left_on='cell_id', right_on='hex', how='left')
+            for file in selected_file:
+                # Read the measurement .csv file
+                temp_meas_df = pd.read_csv(file, header=None,  names=meas_column_names, delimiter=',')
+                # Merge the DataFrames on 'cell_id' column
+                temp_meas_df = temp_meas_df.merge(bts_df, left_on='cell_id', right_on='hex', how='left')
+                # Append the anouther DataFrame to the measurement DataFrame
+                meas_df = pd.concat([meas_df, temp_meas_df], ignore_index=True)
             # Perform '/ 100' operation on the 'rsrq' column to get float values
             meas_df['rsrq'] /= 100
             # Perform '/ 10' operation on the 'rssi' column to get float values
@@ -269,8 +284,20 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                               'RSRQ: ' + meas_df['rsrq'].astype(str) + ' dB'  + '<br>' + \
                               'RSSI: ' + meas_df['rssi'].astype(str) + ' dBm'  + '<br>' + \
                               'RSSNR: ' + meas_df['rssnr'].astype(str) + ' dB'
-            initial_lat = float(meas_df['latitude'].iloc[-1])
-            initial_lon = float(meas_df['longitude'].iloc[-1])
+            # Filter the DataFrame based on selected value
+            if selected_band != None:
+                meas_df = meas_df[meas_df['band'] == selected_band]
+            elif seleceted_rat != None:
+                meas_df = meas_df[meas_df['rat'] == seleceted_rat]
+            elif selected_operator != None:
+                meas_df = meas_df[meas_df['mobile_country_code'] == selected_operator]
+            # Initialize the position of which is the map open
+            if 0 < len(meas_df):
+                initial_lat = float(meas_df['latitude'].iloc[-1])
+                initial_lon = float(meas_df['longitude'].iloc[-1])
+            else:
+                initial_lat = 49.1947
+                initial_lon = 16.6078
 ###############################################################
             if selected_method != None:
                 grid_x, grid_y = np.mgrid[min(meas_df['latitude']):max(meas_df['latitude']):100j, min(meas_df['longitude']):max(meas_df['longitude']):100j]
@@ -340,7 +367,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                 line=dict(width=2, color='grey'),
                 text=meas_df['text'],
                 hoverinfo='text',
-                name='Measured RSSNR Points',
+                name='Measured SINR Points',
                 visible='legendonly'  # Set visibility to legendonly by default
             )
 ###############################################################
@@ -372,7 +399,6 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
             # Create the map layout
             map_layout = go.Layout(
                 mapbox_style='open-street-map',
-                #mapbox_style='basic',
                 hovermode='closest',
                 height=1000,  # Set the height of the map
                 width=1000,    # Set the width of the map
@@ -397,6 +423,9 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
                                             scatter_mapbox_trace_sinr, scatter_mapbox_trace_cells], layout=map_layout)
             prev_selected_file = selected_file  # Update the previous selected file
             prev_selected_method = selected_method  # Update the previous selected method
+            prev_selected_band = selected_band # Update the previous selected band
+            prev_selected_rat = seleceted_rat # Update the previous selected rat
+            prev_selected_operator = selected_operator # Update the previous selected operator  
 ###############################################################
     # Use dash.callback_context to determine which input triggered the callback
     ctx = dash.callback_context
@@ -506,7 +535,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
         ),
         name='RSRP',
     )
-    # Create the line chart layout
+    # Create the line chart layout (you can customize this)
     line_layout_rsrp = go.Layout(
         title='RSRP',
         xaxis=dict(title='time', tickangle=45),
@@ -527,7 +556,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
         ),
         name='RSRQ',
     )
-    # Create the line chart layout
+    # Create the line chart layout (you can customize this)
     line_layout_rsrq = go.Layout(
         title='RSRQ',
         xaxis=dict(title='time', tickangle=45),
@@ -548,7 +577,7 @@ def update_charts(selected_file, selected_method, rsrp_click_data, rsrq_click_da
         ),
         name='RSSNR',
     )
-    # Create the line chart layout
+    # Create the line chart layout (you can customize this)
     line_layout_sinr = go.Layout(
         title='RSSNR',
         xaxis=dict(title='time', tickangle=45),
@@ -597,8 +626,10 @@ def update_selectors_options(selected_file):
         if selected_file != None:
             # Initialize a methods for interpolation
             interpolation_methods = ['Linear Interpolation', 'Nearest-Neighbor Interpolation', 'Cubic Interpolation']
-            # Make a delay between execution of two callbacks for filling up the unique values into selectors
+            # Make a delay between execution of two callbacks
             time.sleep(0.4)
+        else:
+            return [], [], [], []
 ###############################################################
         prev_selected_file_2 = selected_file  # Update the previous selected file
         # Update options based on the selected rat 
