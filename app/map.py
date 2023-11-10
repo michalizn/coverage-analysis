@@ -211,14 +211,16 @@ app.layout = html.Div([
 ###############################################################        
         dcc.Graph(id='rsrp-chart', className='graph', style={'height': '300px', 'margin-bottom': '10px'}),
         dcc.Graph(id='rsrq-chart', className='graph', style={'height': '300px', 'margin-bottom': '10px'}),
-        dcc.Graph(id='sinr-chart', className='graph', style={'height': '300px', 'margin-bottom': '10px'}),
+        dcc.Graph(id='rssi-chart', className='graph', style={'height': '300px', 'margin-bottom': '10px'}),
+        dcc.Graph(id='rssnr-chart', className='graph', style={'height': '300px', 'margin-bottom': '10px'}),
     ], style={'flex': '2', 'display': 'flex', 'flex-direction': 'column'}),
 ], style={'display': 'flex'})
 ###############################################################
 @app.callback(
     [Output('rsrp-chart', 'figure'), 
-     Output('rsrq-chart', 'figure'), 
-     Output('sinr-chart', 'figure'), 
+     Output('rsrq-chart', 'figure'),
+     Output('rssi-chart', 'figure'),  
+     Output('rssnr-chart', 'figure'), 
      Output('map', 'figure')
     ],
     [Input('data-selector', 'value'), 
@@ -227,15 +229,16 @@ app.layout = html.Div([
      Input('rat-selector', 'value'),
      Input('operator-selector', 'value'),
      Input('rsrp-chart', 'clickData'), 
-     Input('rsrq-chart', 'clickData'), 
-     Input('sinr-chart', 'clickData'), 
+     Input('rsrq-chart', 'clickData'),
+     Input('rssi-chart', 'clickData'), 
+     Input('rssnr-chart', 'clickData'), 
      Input('map', 'clickData')],
     [State('rsrp-chart', 'figure'), 
      State('rsrq-chart', 'figure'), 
-     State('sinr-chart', 'figure'), 
+     State('rssnr-chart', 'figure'), 
      State('map', 'figure')]
 )
-def update_charts(selected_file, selected_method, selected_band, seleceted_rat, selected_operator, rsrp_click_data, rsrq_click_data, sinr_click_data, map_click_data, rsrp_figure, rsrq_figure, sinr_figure, map_figure):
+def update_charts(selected_file, selected_method, selected_band, seleceted_rat, selected_operator, rsrp_click_data, rsrq_click_data, rssi_click_data, rssnr_click_data, map_click_data, rsrp_figure, rsrq_figure, sinr_figure, map_figure):
     initial_lat = 0
     initial_lon = 0
     global prev_selected_file  # Use the global keyword to update the previous selected file
@@ -249,6 +252,7 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
         map_figure['data'] = []
 ###############################################################
         if selected_file != None:
+            meas_df = pd.DataFrame(columns=meas_column_names)
             for file in selected_file:
                 # Read the measurement .csv file
                 temp_meas_df = pd.read_csv(file, header=None,  names=meas_column_names, delimiter=',')
@@ -296,6 +300,7 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
                 initial_lat = float(meas_df['latitude'].iloc[-1])
                 initial_lon = float(meas_df['longitude'].iloc[-1])
             else:
+                # Brno center location
                 initial_lat = 49.1947
                 initial_lon = 16.6078
 ###############################################################
@@ -350,7 +355,7 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
                 lat=meas_df['latitude'],
                 lon=meas_df['longitude'],
                 mode='markers+lines',
-                marker=dict(size=10, symbol="circle", color=meas_df['color_rsrp'], opacity=1, colorscale='Viridis'),
+                marker=dict(size=10, symbol="circle", color=meas_df['color_rsrq'], opacity=1, colorscale='Viridis'),
                 line=dict(width=2, color='grey'),
                 text=meas_df['text'],
                 hoverinfo='text',
@@ -359,15 +364,28 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             )
 ###############################################################
             # Create Scattermapbox trace for measured RSSNR points
-            scatter_mapbox_trace_sinr = go.Scattermapbox(
+            scatter_mapbox_trace_rssi = go.Scattermapbox(
                 lat=meas_df['latitude'],
                 lon=meas_df['longitude'],
                 mode='markers+lines',
-                marker=dict(size=10, symbol="circle", color=meas_df['color_rsrp'], opacity=1, colorscale='Viridis'),
+                marker=dict(size=10, symbol="circle", color=meas_df['color_rssi'], opacity=1, colorscale='Viridis'),
                 line=dict(width=2, color='grey'),
                 text=meas_df['text'],
                 hoverinfo='text',
-                name='Measured SINR Points',
+                name='Measured RSSI Points',
+                visible='legendonly'  # Set visibility to legendonly by default
+            )
+###############################################################
+            # Create Scattermapbox trace for measured RSSNR points
+            scatter_mapbox_trace_rssnr = go.Scattermapbox(
+                lat=meas_df['latitude'],
+                lon=meas_df['longitude'],
+                mode='markers+lines',
+                marker=dict(size=10, symbol="circle", color=meas_df['color_rssnr'], opacity=1, colorscale='Viridis'),
+                line=dict(width=2, color='grey'),
+                text=meas_df['text'],
+                hoverinfo='text',
+                name='Measured RSSNR Points',
                 visible='legendonly'  # Set visibility to legendonly by default
             )
 ###############################################################
@@ -415,12 +433,13 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             if selected_method != None:
                 # Create the figure and add the scatter mapbox trace
                 map_figure = go.Figure(data=[scatter_mapbox_trace_rsrp, scatter_mapbox_trace_rsrq, 
-                                            scatter_mapbox_trace_sinr, scatter_mapbox_trace_cells, 
-                                            scatter_mapbox_trace_interpolated_rsrp], layout=map_layout)
+                                            scatter_mapbox_trace_rssi, scatter_mapbox_trace_rssnr, 
+                                            scatter_mapbox_trace_cells, scatter_mapbox_trace_interpolated_rsrp], layout=map_layout)
             else:
                 # Create the figure and add the scatter mapbox trace
                 map_figure = go.Figure(data=[scatter_mapbox_trace_rsrp, scatter_mapbox_trace_rsrq, 
-                                            scatter_mapbox_trace_sinr, scatter_mapbox_trace_cells], layout=map_layout)
+                                            scatter_mapbox_trace_rssi, scatter_mapbox_trace_rssnr, 
+                                            scatter_mapbox_trace_cells], layout=map_layout)
             prev_selected_file = selected_file  # Update the previous selected file
             prev_selected_method = selected_method  # Update the previous selected method
             prev_selected_band = selected_band # Update the previous selected band
@@ -436,13 +455,15 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
 ###############################################################
     if ctx.triggered:
         trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        if trigger_id == 'rsrp-chart' or trigger_id == 'rsrq-chart' or trigger_id == 'sinr-chart':
+        if trigger_id == 'rsrp-chart' or trigger_id == 'rsrq-chart' or trigger_id == 'rssi-chart' or trigger_id == 'rssnr-chart':
             if trigger_id == 'rsrp-chart':
                 index = rsrp_click_data['points'][0]['pointIndex']
             elif trigger_id == 'rsrq-chart':
                 index = rsrq_click_data['points'][0]['pointIndex']
-            elif trigger_id == 'sinr-chart':
-                index = sinr_click_data['points'][0]['pointIndex']
+            elif trigger_id == 'rssi-chart':
+                index = rssi_click_data['points'][0]['pointIndex']
+            elif trigger_id == 'rssnr-chart':
+                index = rssnr_click_data['points'][0]['pointIndex']
             else:
                 index = 0
             # Highlight the selected point by changing its marker color
@@ -564,7 +585,28 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
     )
 ###############################################################
     # Create the line trace with updated marker colors
-    line_trace_sinr = go.Scatter(
+    line_trace_rssi = go.Scatter(
+        x=meas_df['time'],
+        y=meas_df['rssi'],
+        mode='lines+markers',  # Display lines and markers
+        line=dict(width=2, color='blue'),
+        marker=dict(
+            size=8,
+            opacity=marker_opacity,
+            color=marker_colors,  # Set marker colors
+            symbol='square',
+        ),
+        name='RSSI',
+    )
+    # Create the line chart layout (you can customize this)
+    line_layout_rssi = go.Layout(
+        title='RSSI',
+        xaxis=dict(title='time', tickangle=45),
+        yaxis=dict(title='RSSI (dBm)'),
+    )
+###############################################################
+    # Create the line trace with updated marker colors
+    line_trace_rssnr = go.Scatter(
         x=meas_df['time'],
         y=meas_df['rssnr'],
         mode='lines+markers',  # Display lines and markers
@@ -578,7 +620,7 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
         name='RSSNR',
     )
     # Create the line chart layout (you can customize this)
-    line_layout_sinr = go.Layout(
+    line_layout_rssnr = go.Layout(
         title='RSSNR',
         xaxis=dict(title='time', tickangle=45),
         yaxis=dict(title='RSSNR (dB)'),
@@ -587,9 +629,10 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
     # Create the figure and add the scatter mapbox trace
     rsrp_figure = go.Figure(data=[line_trace_rsrp], layout=line_layout_rsrp)
     rsrq_figure = go.Figure(data=[line_trace_rsrq], layout=line_layout_rsrq)
-    sinr_figure = go.Figure(data=[line_trace_sinr], layout=line_layout_sinr)
+    rssi_figure = go.Figure(data=[line_trace_rssi], layout=line_layout_rssi)
+    rssnr_figure = go.Figure(data=[line_trace_rssnr], layout=line_layout_rssnr)
 ###############################################################
-    return rsrp_figure, rsrq_figure, sinr_figure, map_figure
+    return rsrp_figure, rsrq_figure, rssi_figure, rssnr_figure, map_figure
 ###############################################################
 @app.callback(
     [Output('rat-selector', 'disabled'),
