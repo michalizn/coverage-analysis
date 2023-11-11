@@ -110,7 +110,7 @@ prev_selected_band = None
 prev_selected_rat = None
 prev_selected_operator = None 
 # Define column names
-meas_column_names = ['date', 'time', 'csq', 'rat', 'operation_mode', 'mobile_country_code', 'location_area_code',
+meas_column_names = ['date', 'time', 'operator', 'csq', 'rat', 'operation_mode', 'mobile_country_code', 'location_area_code',
                      'cell_id', 'arfcn', 'band', 'downlink_frequency', 'downlink_bandwidth', 'uplink_bandwidth',
                      'rsrp', 'rsrq', 'rssi', 'rssnr', 'latitude', 'ns_indicator', 'longitude', 'ew_ndicator',
                      'date2', 'time2', 'altitude', 'speed', 'course', 'color_rsrp', 'color_rsrq', 'color_rssi',
@@ -275,6 +275,7 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             # Formating to display multiple columns in the text while hovering over the points in the map
             meas_df['text'] = 'Meausered time: ' + meas_df['date'].astype(str) + ' ' + meas_df['time'].astype(str) + '<br>' + \
                               'CSQ: ' + meas_df['csq'].astype(str) + '<br>' + \
+                              'Operator: ' + meas_df['operator'].astype(str) + '<br>' + \
                               'RAT: ' + meas_df['rat'].astype(str) + '<br>' + \
                               'Mobile Country Code: ' + meas_df['mobile_country_code'].astype(str) + '<br>' + \
                               'Location Area Code: ' + meas_df['location_area_code'].astype(str) + '<br>' + \
@@ -294,7 +295,7 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             elif seleceted_rat != None:
                 meas_df = meas_df[meas_df['rat'] == seleceted_rat]
             elif selected_operator != None:
-                meas_df = meas_df[meas_df['mobile_country_code'] == selected_operator]
+                meas_df = meas_df[meas_df['operator'] == selected_operator]
             # Initialize the position of which is the map open
             if 0 < len(meas_df):
                 initial_lat = float(meas_df['latitude'].iloc[-1])
@@ -676,7 +677,7 @@ def update_selectors_options(selected_file):
 ###############################################################
         prev_selected_file_2 = selected_file  # Update the previous selected file
         # Update options based on the selected rat 
-        return list(meas_df['band'].unique()), list(meas_df['rat'].unique()), list(meas_df['mobile_country_code'].unique()), interpolation_methods
+        return list(meas_df['band'].unique()), list(meas_df['rat'].unique()), list(meas_df['operator'].unique()), interpolation_methods
     else:
         # If no data are selected, return empty options for other selectors
         return [], [], [], []
