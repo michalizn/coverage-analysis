@@ -1,38 +1,33 @@
 import serial
 import csv
 import time
-# commands = ["ATI\r\n", "AT\r\n", "AT+QGPSCFG=\"nmeasrc\",1\r\n", "ATE1V1\r\n", "AT+CPIN?\r\n", "AT+CSQ\r\n", "AT+COPS?\r\n", "AT+CGREG?\r\n", "AT+CGDCONT=1,\"IP\",\"internet.t-mobile.cz\"\r\n", "AT+CGDCONT?\r\n",
-#            "AT+CGATT=1\r\n", "AT+CGATT?\r\n", "AT+CGPADDR=1\r\n", "AT+QPING=1,\"seznam.cz\",1,1\r\n", "AT+QENG=\"servingcell\"\r\n", "AT+QGPSGNMEA\r\n", "AT+QGPSLOC\r\n","AT+QGPSEND\r\n"]
+
+TEST = True
+
 # commands = ["AT+CGPS=1\r\n", "AT+CGPS?\r\n", "AT+CGPSINFO\r\n", "ATI\r\n", "ATE1\r\n", "AT+CPIN?\r\n", "AT+CSQ\r\n", "AT+COPS?\r\n", "AT+CGPS=0\r\n"]
-meas_data_path = r'C:\Users\Michal\Desktop\Python\5G_module\measured_data'
+meas_data_path = r'/home/baranekm/Documents/Python/5G_module/measured_data'
 meas_data = []
 
 # Prepared commands
 init_commands = ["ATI\r\n", "AT+CNMP=109\r\n", "ATE1\r\n", "AT+COPS?\r\n"]
-meas_commands = ["AT+CCLK?\r\n", "AT+CSQ\r\n", "AT+CPSI?\r\n", "AT+CGPSINFO\r\n"]
+meas_commands = ["AT+CCLK?\r\n", "AT+COPS?\r\n", "AT+CSQ\r\n", "AT+CPSI?\r\n", "AT+CGPSINFO\r\n"]
 end_commands = ["AT+CGPS=0\r\n"]
 
 # Time duration of measurament in seconds
-meas_duration = 10 * 1
+meas_duration = 10
 
 # Opening of the serial ports
 serial_port_AT = serial.Serial('/dev/ttyUSB2', baudrate=115200, timeout=1)
-#serial_port_NMEA = serial.Serial('COM28', baudrate=115200, timeout=1)
 
 # Check if the ports are open
 if serial_port_AT.is_open:
     print("Serial port opened successfully.")
 else:
     print("Failed to open serial port.")
-# if serial_port_NMEA.is_open:
-#     print("Serial port opened successfully.")
-# else:
-#     print("Failed to open serial port.")
 
 # Clear any existing data in the serial buffer
 print("Clearing input buffers")
 serial_port_AT.reset_input_buffer()
-# serial_port_NMEA.reset_input_buffer()
 
 # Execute the initial commands
 for i in range(len(init_commands)):
@@ -58,8 +53,9 @@ if '0' in response:
 
 # Wait 60s to intialize all the functionality of the module
 print("Wait for 60s")
-time.sleep(60 * 0)
-
+if not TEST:
+    time.sleep(60)
+    
 # Get the starting time
 start_time = time.time()
 
@@ -111,7 +107,11 @@ while (time.time() - start_time) < meas_duration:
                 if "+" in response[i]:
                     response[i] = response[i][:response[i].find('+')]
                 temp_data.append(response[i])
-        elif "CSQ" in response and command_index == 1:
+        if "COPS" in response and command_index == 1:
+            response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+COPS?+COPS: ", "").replace(".0", "")
+            response = response.split(',')
+            temp_data.append(response[2])
+        elif "CSQ" in response and command_index == 2:
             response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+CSQ+CSQ: ", "").replace(",", ".").replace(".0", "")
             response = response.split(',')
             for i in range(len(response)):
@@ -119,12 +119,12 @@ while (time.time() - start_time) < meas_duration:
                     temp_data.append(float(response[i]))
                 except:
                     temp_data.append(float(0.0))
-        elif "CPSI" in response and command_index == 2:
+        elif "CPSI" in response and command_index == 3:
             response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+CPSI?+CPSI: ", "").replace(".0", "")
             response = response.split(',')
             for i in range(len(response)):
                 temp_data.append(response[i])
-        elif "CGPSINFO" in response and command_index == 3:
+        elif "CGPSINFO" in response and command_index == 4:
             response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("+CGPSINFO: ", "").replace(".0", "")
             response = response.split(',')
             for i in range(len(response)):
@@ -136,9 +136,6 @@ while (time.time() - start_time) < meas_duration:
                 temp_data.append(response[i])
         else:
             response = None
-            # Write the response in list
-            # temp_data.append(response.replace("\r", "").replace("\n", "").replace("OK", "").replace("AT+CCLK?+CCLK: ", "").replace("AT+CSQ+CSQ: ", ",").replace("AT+CPSI?+CPSI: ", ",").replace("+CGPSINFO: ", ",").replace("\".0", "\""))
-            #temp_data.append(response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+CCLK?+CCLK: ", "").replace("AT+CSQ+CSQ: ", "").replace("AT+CPSI?+CPSI: ", "").replace("+CGPSINFO: ", ""))
     if response != None:
         meas_data.append(tuple(temp_data))
 
@@ -155,9 +152,8 @@ for command_index in range(len(end_commands)):
 
 # Close the serial port
 serial_port_AT.close()
-# serial_port_NMEA.close()
 
-data_path = meas_data_path + '\\' + str(meas_data[0][0]).replace("/", "") + str(meas_data[0][1]).replace(":", "") + '.csv'
+data_path = meas_data_path + '/' + str(meas_data[0][0]).replace("/", "") + str(meas_data[0][1]).replace(":", "") + '.csv'
 # Write each tuple as a line in the file
 data = open(data_path, 'w', newline='')
 csv_writer = csv.writer(data)
