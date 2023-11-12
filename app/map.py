@@ -139,6 +139,19 @@ app = dash.Dash(__name__)
 app.layout = html.Div([
     html.Div([
 ###############################################################
+        html.Label('Measurement settings:'),
+        html.Div([
+            html.Label('- Name (default format e.g.: 230615193026): '),
+            dcc.Input(id='measurement-name', type='text', value='', debounce=True),
+            html.Label('.csv'),
+            html.Label(id='out-measurement-name')
+        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
+        html.Div([
+            html.Label('- Duration (min. 1s): '),
+            dcc.Input(id='measurement-duration', type='text', value='', debounce=True),
+            html.Label(' seconds'),
+            html.Label(id='out-measurement-duration')
+        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
         html.Label('Select the data for proccesing:'),  # Label for the second additional data selector
         dcc.Dropdown(
             id='data-selector',
@@ -273,7 +286,7 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             # Map 'rssnr' values to colors
             map_column_to_color(meas_df, 'rssnr')
             # Formating to display multiple columns in the text while hovering over the points in the map
-            meas_df['text'] = 'Meausered time: ' + meas_df['date'].astype(str) + ' ' + meas_df['time'].astype(str) + '<br>' + \
+            meas_df['text'] = 'Meausered time: ' + meas_df['time'].astype(str) + ', ' + meas_df['date'].astype(str) + '<br>' + \
                               'CSQ: ' + meas_df['csq'].astype(str) + '<br>' + \
                               'Operator: ' + meas_df['operator'].astype(str) + '<br>' + \
                               'RAT: ' + meas_df['rat'].astype(str) + '<br>' + \
@@ -555,6 +568,8 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             color=marker_colors,  # Set marker colors
             symbol='square',
         ),
+        text=meas_df['text'],
+        hoverinfo='text',
         name='RSRP',
     )
     # Create the line chart layout (you can customize this)
@@ -576,6 +591,8 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             color=marker_colors,  # Set marker colors
             symbol='square',
         ),
+        text=meas_df['text'],
+        hoverinfo='text',
         name='RSRQ',
     )
     # Create the line chart layout (you can customize this)
@@ -597,6 +614,8 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             color=marker_colors,  # Set marker colors
             symbol='square',
         ),
+        text=meas_df['text'],
+        hoverinfo='text',
         name='RSSI',
     )
     # Create the line chart layout (you can customize this)
@@ -618,6 +637,8 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             color=marker_colors,  # Set marker colors
             symbol='square',
         ),
+        text=meas_df['text'],
+        hoverinfo='text',
         name='RSSNR',
     )
     # Create the line chart layout (you can customize this)
@@ -682,6 +703,20 @@ def update_selectors_options(selected_file):
         # If no data are selected, return empty options for other selectors
         return [], [], [], []
 ###############################################################
+# Callback function that takes inputs from the input boxes and returns the output
+@app.callback(
+    [Output('out-measurement-name', 'children'),
+     Output('out-measurement-duration', 'children')],
+    [Input('measurement-name', 'value'),
+     Input('measurement-duration', 'value')]
+)
+def update_output(meas_name, meas_duration):
+    # Perform some function with the input values
+    # result_meas_name = f' Measurement file name: {meas_name}.csv'
+    # result_meas_duration = f' Measurement duration: {meas_duration} s'
+    result_meas_name = None
+    result_meas_duration = None
+    return result_meas_name, result_meas_duration
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
