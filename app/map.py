@@ -152,6 +152,29 @@ app.layout = html.Div([
             html.Label(' seconds'),
             html.Label(id='out-measurement-duration')
         ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
+        html.Div([
+            html.Label('- Sample by meters or secods: '),
+            html.Div([
+                dcc.Dropdown(id='measurement-type', options=['meters', 'seconds'])
+            ], style={'width': '30%', 'margin-left': '10px', 'margin-top': '10px'}),
+        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
+        html.Div([
+            html.Label('- Technology: '),
+            html.Div([
+                dcc.Dropdown(id='measurement-rat', options=['4G', '5G'])
+            ], style={'width': '30%', 'margin-left': '10px', 'margin-top': '10px'}),
+        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
+        html.Div([
+            html.Label('- Band: '),
+            html.Div([
+                dcc.Dropdown(id='measurement-band', options=['EUTRAN-BAND3', 'EUTRAN-BAND8'], multi=True)
+            ], style={'width': '30%', 'margin-left': '10px', 'margin-top': '10px'}),
+        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
+        html.Div([
+            html.Label('Start the measurement: '),
+            html.Button('Start', id='button', style={'backgroundColor': 'green'}),
+            html.Div(id='output')
+        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px', 'margin-bottom': '10px'}),
         html.Label('Select the data for proccesing:'),  # Label for the second additional data selector
         dcc.Dropdown(
             id='data-selector',
@@ -717,6 +740,29 @@ def update_output(meas_name, meas_duration):
     result_meas_name = None
     result_meas_duration = None
     return result_meas_name, result_meas_duration
+###############################################################
+# Callback function that takes input from the button click
+@app.callback(
+    [Output('output', 'children'),
+     Output('button', 'style'),
+     Output('button', 'children')],
+    [Input('button', 'n_clicks')],
+    [State('button', 'children')]
+)
+def update_output(n_clicks, button_text):
+    if n_clicks is None:
+        return None, dash.no_update, dash.no_update
+
+    if button_text == 'Start':
+        button_style = {'backgroundColor': 'red'}
+        new_text = 'Stop'
+    else:
+        button_style = {'backgroundColor': 'green'}
+        new_text = 'Start'
+
+    # Perform some function
+    result = None
+    return result, button_style, new_text
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
