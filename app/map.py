@@ -115,6 +115,9 @@ meas_column_names = ['date', 'time', 'operator', 'csq', 'rat', 'operation_mode',
                      'rsrp', 'rsrq', 'rssi', 'rssnr', 'latitude', 'ns_indicator', 'longitude', 'ew_ndicator',
                      'date2', 'time2', 'altitude', 'speed', 'course', 'color_rsrp', 'color_rsrq', 'color_rssi',
                      'color_rssnr', 'text']
+# Define the 4G and 5G bands in europe
+bands_czech_republic_4g = ['EUTRAN-BAND1', 'EUTRAN-BAND3', 'EUTRAN-BAND7', 'EUTRAN-BAND20']
+bands_czech_republic_5g = ['NR-BANDn1', 'NR-BANDn3', 'NR-BANDn7', 'NR-BANDn28']
 # Define the main dataframe
 meas_df = pd.DataFrame(columns=meas_column_names)
 ###############################################################
@@ -138,49 +141,94 @@ app = dash.Dash(__name__)
 ###############################################################
 app.layout = html.Div([
     html.Div([
+        html.Div([
+            html.Div([
+                html.Label('Measurement Name:'),  # Label for the first additional data selector
+                dcc.Input(id='measurement-name', type='text', placeholder='Measurement Name', style={'width': '97%', 'height': '30px'}),
+                html.Label(id='out-measurement-name')
+            ], style={'width': '33%', 'margin-right': '10px', 'margin-left': '10px'}),
 ###############################################################
-        html.Label('Measurement settings:'),
-        html.Div([
-            html.Label('- Name (default format e.g.: 230615193026): '),
-            dcc.Input(id='measurement-name', type='text', value='', debounce=True),
-            html.Label('.csv'),
-            html.Label(id='out-measurement-name')
-        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
-        html.Div([
-            html.Label('- Duration (min. 1s): '),
-            dcc.Input(id='measurement-duration', type='text', value='', debounce=True),
-            html.Label(' seconds'),
-            html.Label(id='out-measurement-duration')
-        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
-        html.Div([
-            html.Label('- Sample by meters or secods: '),
             html.Div([
-                dcc.Dropdown(id='measurement-type', options=['meters', 'seconds'])
-            ], style={'width': '30%', 'margin-left': '10px', 'margin-top': '10px'}),
-        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
-        html.Div([
-            html.Label('- Technology: '),
+                html.Label('Measurement Duration'),  # Label for the second additional data selector
+                dcc.Input(id='measurement-duration', type='text', placeholder='Measurement Duration in seconds', style={'width': '97%', 'height': '30px'}),
+                html.Label(id='out-measurement-duration')
+            ], style={'width': '33%', 'margin-right': '10px'}),
+###############################################################
             html.Div([
-                dcc.Dropdown(id='measurement-rat', options=['4G', '5G'])
-            ], style={'width': '30%', 'margin-left': '10px', 'margin-top': '10px'}),
-        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
+                html.Label('Measurement technology:'),  # Label for the third additional data selector
+                dcc.Dropdown(
+                    id='measurement-technology',
+                    options=['4G', '5G'],
+                    placeholder="Select Radio Access Technology"
+                )
+            ], style={'width': '33%'}),
+        ], style={'display': 'flex', 'margin-right': '10px', 'margin-bottom': '20px'}),
+###############################################################
         html.Div([
-            html.Label('- Band: '),
             html.Div([
-                dcc.Dropdown(id='measurement-band', options=['EUTRAN-BAND3', 'EUTRAN-BAND8'], multi=True)
-            ], style={'width': '30%', 'margin-left': '10px', 'margin-top': '10px'}),
-        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px'}),
+                html.Label('Measurement Sample Frequency:'),  # Label for the first additional data selector
+                dcc.Slider(
+                    id='my-slider',
+                    min=1,
+                    max=100,
+                    step=1,
+                    value=1,
+                    marks={i: f'{i}' for i in range(0, 100, 5)},
+                ),
+            ], style={'width': '80%', 'margin-right': '10px'}),
+            html.Div(id='slider-output', style={'width': '5%', 'margin-top' : '25px'}),
+###############################################################
+            html.Div([
+                html.Label('Sampling unit:'),  # Label for the third additional data selector
+                dcc.Dropdown(
+                    id='measurement-type',
+                    options=['METERS', 'SECONDS'],
+                    placeholder="Select sampling unit Meters/Seconds"
+                )
+            ], style={'width': '15%'}),
+        ], style={'display': 'flex', 'margin': '10px'}),
+###############################################################        
         html.Div([
-            html.Label('Start the measurement: '),
-            html.Button('Start', id='button', style={'backgroundColor': 'green'}),
-            html.Div(id='output')
-        ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px', 'margin-bottom': '10px'}),
-        html.Label('Select the data for proccesing:'),  # Label for the second additional data selector
+            html.Div([
+                html.Label('Measurement Preferred Band:'),  # Label for the first additional data selector
+                dcc.Dropdown(
+                    id='measurement-band',
+                    options=[],
+                    placeholder="Select Preferred Measurement Band"
+                )
+            ], style={'width': '33%', 'margin-right': '10px', 'margin-left': '10px'}),
+###############################################################
+            html.Div([
+                # html.Label('Measurement Duration'),  # Label for the second additional data selector
+                # dcc.Dropdown(
+                #     id='measurement-type',
+                #     options=['METERS', 'SECONDS'],
+                #     placeholder="Select sampling unit Meters/Seconds"
+                # )
+                html.Label('Start the measurement: '),
+            ], style={'width': '33%', 'margin-right': '10px', 'margin-top' : '30px', 'margin-left' : '80px'}),
+###############################################################
+            html.Div([
+                # html.Label('Measurement technology:'),  # Label for the third additional data selector
+                # dcc.Dropdown(
+                #     id='measurement-technology',
+                #     options=['4G', '5G'],
+                #     placeholder="Select Radio Access Technology"
+                # )
+                html.Button('Start', id='button', style={'backgroundColor': 'green', 'width': '150px', 'height': '50px'}),
+                html.Div(id='output')
+            ], style={'width': '33%', 'margin-top' : '15px'}),
+        ], style={'display': 'flex', 'margin-right': '10px', 'margin-bottom': '20px'}),
+###############################################################
+        # html.Div([
+        #     html.Label('Start the measurement: '),
+        #     html.Button('Start', id='button', style={'backgroundColor': 'green', 'width': '150px', 'height': '50px'}),
+        #     html.Div(id='output')
+        # ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px', 'margin-bottom': '10px'}),
+        html.Label('Select the data for proccesing:', style={'margin-bottom' : '10px'}),  # Label for the second additional data selector
         dcc.Dropdown(
             id='data-selector',
             options=[
-                # {'label': f'Data Set {i}', 'value': file_path}
-                # for i, file_path in enumerate(glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv'), start=1)
                 {'label': f'Data Set: {file_name}', 'value': file_path}
                 for file_name, file_path in zip([os.path.basename(file_path) for file_path in glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv')], glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv'))
             ],
@@ -752,17 +800,62 @@ def update_output(meas_name, meas_duration):
 def update_output(n_clicks, button_text):
     if n_clicks is None:
         return None, dash.no_update, dash.no_update
-
+    
+    if n_clicks % 2 == 1:
+        print('Start')
+    else:
+        print('Stop')
     if button_text == 'Start':
-        button_style = {'backgroundColor': 'red'}
+        button_style = {'backgroundColor': 'red', 'width': '150px', 'height': '50px'}
         new_text = 'Stop'
     else:
-        button_style = {'backgroundColor': 'green'}
+        button_style = {'backgroundColor': 'green', 'width': '150px', 'height': '50px'}
         new_text = 'Start'
 
     # Perform some function
     result = None
     return result, button_style, new_text
+###############################################################
+@app.callback(
+    [Output('my-slider', 'min'),
+     Output('my-slider', 'max'),
+     Output('my-slider', 'step'),
+     Output('my-slider', 'value'),
+     Output('my-slider', 'marks'),
+     Output('my-slider', 'disabled')],
+    [Input('measurement-type', 'value')]
+)
+def update_slider(unit):
+    if unit == 'SECONDS':
+        return 1, 100, 1, 1, {i: f'{i}' for i in range(0, 100, 5)}, False
+    elif unit == 'METERS':
+        return 10, 500, 10, 10, {i: f'{i}' for i in range(0, 500, 50)}, False
+    else:
+        return 1, 100, 1, 1, {i: f'{i}' for i in range(0, 100, 5)}, True  # Disable slider if no unit is selected
+###############################################################
+@app.callback(
+    Output('slider-output', 'children'),
+    [Input('my-slider', 'value'),
+     Input('my-slider', 'disabled')]
+)
+def update_output(value, functional):
+    if not functional:
+        return f'{value}'
+    else:
+        return None
+###############################################################
+@app.callback(
+    [Output('measurement-band', 'options'),
+     Output('measurement-band', 'disabled')],
+    [Input('measurement-technology', 'value')]
+)
+def update_bands(technology):
+    if technology == '4G':
+        return bands_czech_republic_4g, False
+    elif technology == '5G':
+        return bands_czech_republic_5g, False
+    else:
+        return [], True  # Disable dropdown menu if no technology is selected
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
