@@ -106,6 +106,7 @@ data_directory = r'/home/baranekm/Documents/Python/5G_module/measured_data'
 prev_selected_file = None
 prev_selected_file_2 = None
 prev_selected_method = None
+prev_selected_interpolation_data = None
 prev_selected_band = None
 prev_selected_rat = None
 prev_selected_operator = None 
@@ -159,6 +160,7 @@ app.layout = html.Div([
                 dcc.Dropdown(
                     id='measurement-technology',
                     options=['4G', '5G'],
+                    multi=True,
                     placeholder="Select Radio Access Technology"
                 )
             ], style={'width': '33%'}),
@@ -271,16 +273,15 @@ app.layout = html.Div([
                 html.Label('Type of interpolation:'),  # Label for the first additional data selector
                 dcc.Dropdown(
                     id='interpolation-selector',
-                    #options=interpolation_methods,
                     placeholder="Select an Interpolation Method..."
                 )
             ], style={'width': '33%', 'margin-right': '10px'}),
 ###############################################################
             html.Div([
-                html.Label('None:'),  # Label for the second additional data selector
+                html.Label('Data for interpolation:'),  # Label for the second additional data selector
                 dcc.Dropdown(
-                    id='data-selector-5',
-                    # Options and other properties for the second additional data selector
+                    id='interpolation-data-selector',
+                    placeholder="Select a dara for interpolation..."
                 )
             ], style={'width': '33%', 'margin-right': '10px'}),
 ###############################################################
@@ -288,7 +289,6 @@ app.layout = html.Div([
                 html.Label('None:'),  # Label for the third additional data selector
                 dcc.Dropdown(
                     id='data-selector-6',
-                    # Options and other properties for the third additional data selector
                 )
             ], style={'width': '33%'}),
         ], style={'display': 'flex', 'margin': '10px'}),
@@ -305,10 +305,10 @@ app.layout = html.Div([
      Output('rsrq-chart', 'figure'),
      Output('rssi-chart', 'figure'),  
      Output('rssnr-chart', 'figure'), 
-     Output('map', 'figure')
-    ],
+     Output('map', 'figure')],
     [Input('data-selector', 'value'), 
      Input('interpolation-selector', 'value'),
+     Input('interpolation-data-selector', 'value'),
      Input('band-selector', 'value'),
      Input('rat-selector', 'value'),
      Input('operator-selector', 'value'),
@@ -322,17 +322,18 @@ app.layout = html.Div([
      State('rssnr-chart', 'figure'), 
      State('map', 'figure')]
 )
-def update_charts(selected_file, selected_method, selected_band, seleceted_rat, selected_operator, rsrp_click_data, rsrq_click_data, rssi_click_data, rssnr_click_data, map_click_data, rsrp_figure, rsrq_figure, sinr_figure, map_figure):
+def update_charts(selected_file, selected_method, selected_interpolation_data, selected_band, seleceted_rat, selected_operator, rsrp_click_data, rsrq_click_data, rssi_click_data, rssnr_click_data, map_click_data, rsrp_figure, rsrq_figure, sinr_figure, map_figure):
     initial_lat = 0
     initial_lon = 0
     global prev_selected_file  # Use the global keyword to update the previous selected file
     global prev_selected_method  # Use the global keyword to update the previous selected method
+    global prev_selected_interpolation_data # Use the global keyword to update the previous selected interpolation data
     global prev_selected_band  # Use the global keyword to update the previous selected method
     global prev_selected_rat  # Use the global keyword to update the previous selected method
     global prev_selected_operator  # Use the global keyword to update the previous selected method
     global meas_df
 ###############################################################
-    if selected_file != prev_selected_file or selected_method != prev_selected_method or selected_band != prev_selected_band or seleceted_rat != prev_selected_rat or selected_operator != prev_selected_operator:
+    if selected_file != prev_selected_file or selected_method != prev_selected_method or selected_interpolation_data != prev_selected_interpolation_data or selected_band != prev_selected_band or seleceted_rat != prev_selected_rat or selected_operator != prev_selected_operator:
         map_figure['data'] = []
 ###############################################################
         if selected_file != None:
@@ -392,12 +393,41 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
             if selected_method != None:
                 grid_x, grid_y = np.mgrid[min(meas_df['latitude']):max(meas_df['latitude']):100j, min(meas_df['longitude']):max(meas_df['longitude']):100j]
                 # Define the interpolation method based on the selected method
-                if selected_method == 'Linear Interpolation':
-                    grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='linear')
-                elif selected_method == 'Nearest-Neighbor Interpolation':
-                    grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='nearest')
-                elif selected_method == 'Cubic Interpolation':
-                    grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='cubic')
+                if selected_interpolation_data == 'RSRP':
+                    if selected_method == 'Linear Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='linear')
+                    elif selected_method == 'Nearest-Neighbor Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='nearest')
+                    elif selected_method == 'Cubic Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='cubic')
+                elif selected_interpolation_data == 'RSRQ':
+                    if selected_method == 'Linear Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrq'], (grid_x, grid_y), method='linear')
+                    elif selected_method == 'Nearest-Neighbor Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrq'], (grid_x, grid_y), method='nearest')
+                    elif selected_method == 'Cubic Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrq'], (grid_x, grid_y), method='cubic')
+                elif selected_interpolation_data == 'RSSI':
+                    if selected_method == 'Linear Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rssi'], (grid_x, grid_y), method='linear')
+                    elif selected_method == 'Nearest-Neighbor Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rssi'], (grid_x, grid_y), method='nearest')
+                    elif selected_method == 'Cubic Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rssi'], (grid_x, grid_y), method='cubic')
+                elif selected_interpolation_data == 'RSSNR':
+                    if selected_method == 'Linear Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rssnr'], (grid_x, grid_y), method='linear')
+                    elif selected_method == 'Nearest-Neighbor Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rssnr'], (grid_x, grid_y), method='nearest')
+                    elif selected_method == 'Cubic Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rssnr'], (grid_x, grid_y), method='cubic')
+                else:
+                    if selected_method == 'Linear Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='linear')
+                    elif selected_method == 'Nearest-Neighbor Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='nearest')
+                    elif selected_method == 'Cubic Interpolation':
+                        grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='cubic')
 ###############################################################
                 # Define RSRP thresholds and corresponding colors
                 rsrp_thresholds = [-80, -85, -90, -95, -100, -105]
@@ -527,6 +557,7 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
                                             scatter_mapbox_trace_cells], layout=map_layout)
             prev_selected_file = selected_file  # Update the previous selected file
             prev_selected_method = selected_method  # Update the previous selected method
+            prev_selected_interpolation_data = selected_interpolation_data # Update the previous selected interpolation data
             prev_selected_band = selected_band # Update the previous selected band
             prev_selected_rat = seleceted_rat # Update the previous selected rat
             prev_selected_operator = selected_operator # Update the previous selected operator  
@@ -732,15 +763,18 @@ def update_charts(selected_file, selected_method, selected_band, seleceted_rat, 
      Output('band-selector', 'disabled'),
      Output('operator-selector', 'disabled'),
      Output('interpolation-selector', 'disabled'),
-     Output('data-selector-5', 'disabled'),
+     Output('interpolation-data-selector', 'disabled'),
      Output('data-selector-6', 'disabled')],
-    [Input('data-selector', 'value')]
+    [Input('data-selector', 'value'),
+     Input('interpolation-data-selector', 'value')]
 )
-def update_selectors_availability(selected_file):
+def update_selectors_availability(selected_file, interpolation_data):
     # Check if a data set is selected
-    if selected_file:
+    if selected_file and interpolation_data:
         # If selected_file is not None, enable the new data selectors
         return False, False, False, False, False, False
+    elif selected_file:
+        return False, False, False, True, False, False
     else:
         # If no data set is selected, disable the new data selectors
         return True, True, True, True, True, True
@@ -749,12 +783,14 @@ def update_selectors_availability(selected_file):
     [Output('band-selector', 'options'),
      Output('rat-selector', 'options'),
      Output('operator-selector', 'options'),
-     Output('interpolation-selector', 'options')],
+     Output('interpolation-selector', 'options'),
+     Output('interpolation-data-selector', 'options')],
     [Input('data-selector', 'value')]
 )
 def update_selectors_options(selected_file):
     global prev_selected_file_2
     interpolation_methods = []
+    interpolation_data = []
 ###############################################################
     # Check if a data are selected
     if selected_file != prev_selected_file_2:
@@ -762,17 +798,18 @@ def update_selectors_options(selected_file):
         if selected_file != None:
             # Initialize a methods for interpolation
             interpolation_methods = ['Linear Interpolation', 'Nearest-Neighbor Interpolation', 'Cubic Interpolation']
+            interpolation_data = ['RSRP', 'RSRQ', 'RSSI', 'RSSNR']
             # Make a delay between execution of two callbacks
             time.sleep(0.4)
         else:
-            return [], [], [], []
+            return [], [], [], [], []
 ###############################################################
         prev_selected_file_2 = selected_file  # Update the previous selected file
         # Update options based on the selected rat 
-        return list(meas_df['band'].unique()), list(meas_df['rat'].unique()), list(meas_df['operator'].unique()), interpolation_methods
+        return list(meas_df['band'].unique()), list(meas_df['rat'].unique()), list(meas_df['operator'].unique()), interpolation_methods, interpolation_data
     else:
         # If no data are selected, return empty options for other selectors
-        return [], [], [], []
+        return [], [], [], [], []
 ###############################################################
 # Callback function that takes inputs from the input boxes and returns the output
 @app.callback(
@@ -850,12 +887,25 @@ def update_output(value, functional):
     [Input('measurement-technology', 'value')]
 )
 def update_bands(technology):
-    if technology == '4G':
-        return bands_czech_republic_4g, False
-    elif technology == '5G':
-        return bands_czech_republic_5g, False
+    selected = ''
+    if technology != None:
+        for rat in technology:
+            if rat == '4G':
+                selected += '4G'
+            if rat == '5G':
+                selected += '5G'
+        if selected == '4G':
+            return bands_czech_republic_4g, False
+        elif selected == '5G':
+            return bands_czech_republic_5g, False
+        elif selected == '4G5G' or selected == '5G4G':
+            bands_czech_republic_4_and_5g = bands_czech_republic_4g + bands_czech_republic_5g
+            return bands_czech_republic_4_and_5g, False
+        else:
+            return [], True  # Disable dropdown menu if no technology is selected
     else:
         return [], True  # Disable dropdown menu if no technology is selected
+###############################################################    
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
