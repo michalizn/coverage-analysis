@@ -1,10 +1,7 @@
 import os
 import glob
 import time
-import random
-import webbrowser
 import pandas as pd
-import json
 from math import sin, cos, sqrt, atan2, radians
 from math import hypot
 import matplotlib.pyplot as plt
@@ -21,209 +18,8 @@ import numpy as np
 from scipy.interpolate import griddata
 from scipy.interpolate import LinearNDInterpolator, CloughTocher2DInterpolator
 from matplotlib import colors as mpl_colors
-import socket
-
-import threading
-import serial
-import csv
 import time 
 
-# Flag to keep track of the button state
-button_state = False
-
-###############################################################
-# Simulate a click on the button within a function
-def simulate_button_click():
-    # Get the current layout
-    layout = app.layout
-
-    # Update the n_clicks property of the button
-    layout['button'].n_clicks += 1
-
-    # Trigger the callback by updating the layout
-    app._layout_tail = []
-
-    # Delay to allow the callback to execute
-    time.sleep(1)
-
-
-# Function to be executed in the background
-def background_function(result_store):
-    global button_state
-
-    TEST = True
-
-    # commands = ["AT+CGPS=1\r\n", "AT+CGPS?\r\n", "AT+CGPSINFO\r\n", "ATI\r\n", "ATE1\r\n", "AT+CPIN?\r\n", "AT+CSQ\r\n", "AT+COPS?\r\n", "AT+CGPS=0\r\n"]
-    meas_data_path = r'/home/baranekm/Documents/Python/5G_module/measured_data'
-    meas_data = []
-
-    # Prepared commands
-    init_commands = ["ATI\r\n", "AT+CNMP=109\r\n", "ATE1\r\n", "AT+COPS?\r\n"]
-    meas_commands = ["AT+CCLK?\r\n", "AT+COPS?\r\n", "AT+CSQ\r\n", "AT+CPSI?\r\n", "AT+CGPSINFO\r\n"]
-    end_commands = ["AT+CGPS=0\r\n"]
-
-    # Time duration of measurament in seconds
-    meas_name = 'test_meas'
-    meas_duration = 10
-    meas_band = 'EUTRAN-BAND3'
-    technology = '4G'
-    sampling_unit = 'SECONDS'
-    sampling_frequency = 1
-    start = True
-
-    # Opening of the serial ports
-    serial_port_AT = serial.Serial('/dev/ttyUSB2', baudrate=115200, timeout=1)
-
-    # Check if the ports are open
-    if serial_port_AT.is_open:
-        print("Serial port opened successfully.")
-    else:
-        print("Failed to open serial port.")
-
-    # Clear any existing data in the serial buffer
-    print("Clearing input buffers")
-    serial_port_AT.reset_input_buffer()
-
-    # Execute the initial commands
-    for i in range(len(init_commands)):
-        # Send an AT command
-        serial_port_AT.write(init_commands[i].encode())
-        # Wait for 2s
-        time.sleep(0.5)
-        # Read the response
-        response = serial_port_AT.read_all().decode()
-        print("Response:\r\n", response)
-        print("\r\n")
-
-    # Is GPS ON or OFF? (Start GPS)
-    serial_port_AT.write("AT+CGPS?\r\n".encode())
-    # Wait for 2s
-    time.sleep(2)
-    # Read the response
-    response = serial_port_AT.read_all().decode().replace("\r", "").replace("\n", "").replace("OK", "")
-    if '0' in response:
-        serial_port_AT.write("AT+CGPS=1\r\n".encode())
-        time.sleep(0.5)
-        print(serial_port_AT.read_all().decode())
-
-    # Wait 60s to intialize all the functionality of the module
-    print("Wait for 60s")
-    if not TEST:
-        time.sleep(60)
-        
-    # Get the starting time
-    start_time = time.time()
-
-    # Run the loop for the specified duration
-    while (time.time() - start_time) < meas_duration and button_state:
-        temp_data = []
-        for command_index in range(len(meas_commands)):
-            # Send an AT command
-            serial_port_AT.write(meas_commands[command_index].encode())
-            # Wait for 0.1s (take sample each second)
-            if command_index < (len(meas_commands) - 1):
-                time.sleep(0.1)
-                # Read the response
-                response = serial_port_AT.read_all().decode()
-                # Get the starting time
-                msg_start_time = time.time()
-                max_wait_msg_time = 3
-                while True:
-                    # When there is OK on the end continue
-                    if "OK" in response:
-                        break
-                    if (time.time() - msg_start_time) < max_wait_msg_time:
-                        print("MSG error!")
-                        # Clear any existing data in the serial buffer
-                        print("Clearing input buffers")
-                        serial_port_AT.reset_input_buffer()
-                        break
-            else:
-                # Get the starting time
-                gps_start_time = time.time()
-                max_wait_gps_time = 3
-                while True:
-                    # Read the response
-                    response = serial_port_AT.read_all().decode()
-                    # When there is full message of GPS, get out
-                    if "+CGPSINFO:" in response:
-                        break
-                    if (time.time() - gps_start_time) > max_wait_gps_time:
-                        print("GPS error!")
-                        response = "GPSNONE"
-                        # Clear any existing data in the serial buffer
-                        print("Clearing input buffers")
-                        serial_port_AT.reset_input_buffer()
-                        break
-            if "CCLK" in response and command_index == 0:
-                response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+CCLK?+CCLK: ", "").replace(".0", "")
-                response = response.split(',')
-                for i in range(len(response)):
-                    if "+" in response[i]:
-                        response[i] = response[i][:response[i].find('+')]
-                    temp_data.append(response[i])
-            if "COPS" in response and command_index == 1:
-                response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+COPS?+COPS: ", "").replace(".0", "")
-                response = response.split(',')
-                temp_data.append(response[2])
-            elif "CSQ" in response and command_index == 2:
-                response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+CSQ+CSQ: ", "").replace(",", ".").replace(".0", "")
-                response = response.split(',')
-                for i in range(len(response)):
-                    try:
-                        temp_data.append(float(response[i]))
-                    except:
-                        temp_data.append(float(0.0))
-            elif "CPSI" in response and command_index == 3:
-                response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+CPSI?+CPSI: ", "").replace(".0", "")
-                response = response.split(',')
-                for i in range(len(response)):
-                    temp_data.append(response[i])
-            elif "CGPSINFO" in response and command_index == 4:
-                response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("+CGPSINFO: ", "").replace(".0", "")
-                response = response.split(',')
-                for i in range(len(response)):
-                    temp_data.append(response[i])
-            elif "GPSNONE" in response:
-                response = ',,,,,,,,,'
-                response = response.split(',')
-                for i in range(len(response)):
-                    temp_data.append(response[i])
-            else:
-                response = None
-        if response != None:
-            meas_data.append(tuple(temp_data))
-
-    # Execute the initial commands
-    for command_index in range(len(end_commands)):
-        # Send an AT command
-        serial_port_AT.write(end_commands[command_index].encode())
-        # Wait for 2s
-        time.sleep(0.5)
-        # Read the response
-        response = serial_port_AT.read_all().decode()
-        print("Response:\r\n", response)
-        print("\r\n")
-
-    # Close the serial port
-    serial_port_AT.close()
-
-    data_path = meas_data_path + '/' + str(meas_data[0][0]).replace("/", "") + str(meas_data[0][1]).replace(":", "") + '.csv'
-    # Write each tuple as a line in the file
-    data = open(data_path, 'w', newline='')
-    csv_writer = csv.writer(data)
-    for item in meas_data:
-        data_row = []
-        for i in range(len(item)):
-            data_row.append(item[i])
-        csv_writer.writerow(data_row)
-
-    # if button_state:
-    #     result = f"Executing function at {time.strftime('%H:%M:%S')}"
-    #     result_store.update({'result': result})
-    # else:
-    #     result_store.clear()
-    simulate_button_click()
 ###############################################################
 def calculate_cumulative_distance(latitudes, longitudes):
     distance = 0.0
@@ -269,7 +65,7 @@ def calculate_distance_between_coordinates(lat1, lon1, lat2, lon2):
 # Define a function to map values to colors based on input column
 def map_column_to_color(df, column_name):
     if column_name == 'rsrp':
-        thresholds = [-80, -90, -100]
+        thresholds = [-90, -120, -140]
         colors = ['lawngreen', 'yellow', 'orange', 'red']
     elif column_name == 'rsrq':
         thresholds = [-10, -15, -20]
@@ -285,7 +81,7 @@ def map_column_to_color(df, column_name):
 
     def map_value_to_color(value):
         for i in range(len(thresholds)):
-            if value >= thresholds[i]:
+            if int(value) >= thresholds[i]:
                 return colors[i]
         return colors[-1]  # Default color for values below the lowest threshold
 
@@ -320,7 +116,7 @@ meas_column_names = ['date', 'time', 'operator', 'csq', 'rat', 'operation_mode',
                      'color_rssnr', 'text']
 # Define the 4G and 5G bands in europe
 bands_czech_republic_4g = ['EUTRAN-BAND1', 'EUTRAN-BAND3', 'EUTRAN-BAND7', 'EUTRAN-BAND20']
-bands_czech_republic_5g = ['NR-BANDn1', 'NR-BANDn3', 'NR-BANDn7', 'NR-BANDn28']
+bands_czech_republic_5g = ['NR-BANDn1', 'NR-BANDn3', 'NR-BANDn78', 'NR-BANDn28']
 # Define the main dataframe
 meas_df = pd.DataFrame(columns=meas_column_names)
 ###############################################################
@@ -341,97 +137,11 @@ map_figure = go.Figure(data=[go.Scattermapbox()], layout=map_layout)
 ###############################################################
 # Create the Dash app
 app = dash.Dash(__name__)
-# gunicorn map:server --bind=192.168.0.102:8000
+# gunicorn map_v1:server --bind=192.168.0.x:8000
 server = app.server
 ###############################################################
 app.layout = html.Div([
     html.Div([
-        html.Div([
-            html.Div([
-                html.Label('Measurement Name:'),  # Label for the first additional data selector
-                dcc.Input(id='measurement-name', type='text', placeholder='Measurement Name', style={'width': '97%', 'height': '30px'}),
-                html.Label(id='out-measurement-name')
-            ], style={'width': '33%', 'margin-right': '10px', 'margin-left': '10px'}),
-###############################################################
-            html.Div([
-                html.Label('Measurement Duration'),  # Label for the second additional data selector
-                dcc.Input(id='measurement-duration', type='text', placeholder='Measurement Duration in seconds', style={'width': '97%', 'height': '30px'}),
-                html.Label(id='out-measurement-duration')
-            ], style={'width': '33%', 'margin-right': '10px'}),
-###############################################################
-            html.Div([
-                html.Label('Measurement technology:'),  # Label for the third additional data selector
-                dcc.Dropdown(
-                    id='measurement-technology',
-                    options=['4G', '5G'],
-                    multi=True,
-                    placeholder="Select Radio Access Technology"
-                )
-            ], style={'width': '33%'}),
-        ], style={'display': 'flex', 'margin-right': '10px', 'margin-bottom': '20px'}),
-###############################################################
-        html.Div([
-            html.Div([
-                html.Label('Measurement Sample Frequency:'),  # Label for the first additional data selector
-                dcc.Slider(
-                    id='my-slider',
-                    min=1,
-                    max=100,
-                    step=1,
-                    value=1,
-                    marks={i: f'{i}' for i in range(0, 100, 5)},
-                ),
-            ], style={'width': '80%', 'margin-right': '10px'}),
-            html.Div(id='slider-output', style={'width': '5%', 'margin-top' : '25px'}),
-###############################################################
-            html.Div([
-                html.Label('Sampling unit:'),  # Label for the third additional data selector
-                dcc.Dropdown(
-                    id='measurement-type',
-                    options=['METERS', 'SECONDS'],
-                    placeholder="Select sampling unit Meters/Seconds"
-                )
-            ], style={'width': '15%'}),
-        ], style={'display': 'flex', 'margin': '10px'}),
-###############################################################        
-        html.Div([
-            html.Div([
-                html.Label('Measurement Preferred Band:'),  # Label for the first additional data selector
-                dcc.Dropdown(
-                    id='measurement-band',
-                    options=[],
-                    placeholder="Select Preferred Measurement Band"
-                )
-            ], style={'width': '33%', 'margin-right': '10px', 'margin-left': '10px'}),
-###############################################################
-            html.Div([
-                # html.Label('Measurement Duration'),  # Label for the second additional data selector
-                # dcc.Dropdown(
-                #     id='measurement-type',
-                #     options=['METERS', 'SECONDS'],
-                #     placeholder="Select sampling unit Meters/Seconds"
-                # )
-                html.Label('Start the measurement: '),
-            ], style={'width': '33%', 'margin-right': '10px', 'margin-top' : '30px', 'margin-left' : '80px'}),
-###############################################################
-            html.Div([
-                # html.Label('Measurement technology:'),  # Label for the third additional data selector
-                # dcc.Dropdown(
-                #     id='measurement-technology',
-                #     options=['4G', '5G'],
-                #     placeholder="Select Radio Access Technology"
-                # )
-                html.Button('Start', id='button', style={'backgroundColor': 'green', 'width': '150px', 'height': '50px'}),
-                html.Div(id='output'),
-                dcc.Store(id='result-store')
-            ], style={'width': '33%', 'margin-top' : '15px'}),
-        ], style={'display': 'flex', 'margin-right': '10px', 'margin-bottom': '20px'}),
-###############################################################
-        # html.Div([
-        #     html.Label('Start the measurement: '),
-        #     html.Button('Start', id='button', style={'backgroundColor': 'green', 'width': '150px', 'height': '50px'}),
-        #     html.Div(id='output')
-        # ], style={'width': '100%', 'margin-left': '10px', 'margin-top': '10px', 'margin-bottom': '10px'}),
         html.Label('Select the data for proccesing:', style={'margin-bottom' : '10px'}),  # Label for the second additional data selector
         dcc.Dropdown(
             id='data-selector',
@@ -550,16 +260,27 @@ def update_charts(selected_file, selected_method, selected_interpolation_data, s
                 temp_meas_df = temp_meas_df.merge(bts_df, left_on='cell_id', right_on='hex', how='left')
                 # Append the anouther DataFrame to the measurement DataFrame
                 meas_df = pd.concat([meas_df, temp_meas_df], ignore_index=True)
-            # Perform '/ 100' operation on the 'rsrq' column to get float values
-            meas_df['rsrq'] /= 100
-            # Perform '/ 10' operation on the 'rssi' column to get float values
+            # Perform '/ 100' or '/ 10' operation on the 'rsrq' column to get float values
+            meas_df.loc[meas_df['rat'] == 'LTE', 'rsrq'] /= 100
+            meas_df.loc[meas_df['rat'] == 'NR5G_NSA', 'rsrq'] /= 10
+            # Perform '/ 10' operation on the columns to get float values
             meas_df['rssi'] /= 10
+            meas_df.loc[meas_df['rat'] == 'NR5G_NSA', 'rsrp'] /= 10
+            meas_df.loc[meas_df['rat'] == 'NR5G_NSA', 'rssnr'] /= 10
+            # Perform valiadation of the data and clip the extreme values
+            meas_df['rsrp'] = meas_df['rsrp'].clip(lower=-200, upper=-30)
+            meas_df['rsrq'] = meas_df['rsrq'].clip(lower=-20, upper=10)
+            meas_df['rssi'] = meas_df['rssi'].clip(lower=-150, upper=0)
+            meas_df['rssnr'] = meas_df['rssnr'].clip(lower=-15, upper=50)
             # Map 'rsrp' values to colors
             map_column_to_color(meas_df, 'rsrp')
             # Map 'rsrq' values to colors
             map_column_to_color(meas_df, 'rsrq')
-            # Map 'rssi' values to colors
-            map_column_to_color(meas_df, 'rssi')
+            try:
+                # Map 'rssi' values to colors
+                map_column_to_color(meas_df, 'rssi')
+            except:
+                print("5G")
             # Map 'rssnr' values to colors
             map_column_to_color(meas_df, 'rssnr')
             # Formating to display multiple columns in the text while hovering over the points in the map
@@ -635,7 +356,7 @@ def update_charts(selected_file, selected_method, selected_interpolation_data, s
                         grid_z = griddata((meas_df['latitude'], meas_df['longitude']), meas_df['rsrp'], (grid_x, grid_y), method='cubic')
 ###############################################################
                 # Define RSRP thresholds and corresponding colors
-                rsrp_thresholds = [-80, -85, -90, -95, -100, -105]
+                rsrp_thresholds = [-70, -90, -100, -120, -130, -160]
                 colors = ['green', 'yellowgreen', 'yellow', 'orange', 'red', 'darkred']
 ###############################################################
                 # Assign colors based on RSRP thresholds
@@ -646,15 +367,15 @@ def update_charts(selected_file, selected_method, selected_interpolation_data, s
                     opacity_interpolated = 0
                     if value > -80:
                         color_interpolated = 'green'
-                        opacity_interpolated = 0.4
-                    elif value < -105:
+                        opacity_interpolated = 1
+                    elif value < -160:
                         color_interpolated = 'darkred'
-                        opacity_interpolated = 0.4
+                        opacity_interpolated = 1
                     else:
                         for i in range(len(rsrp_thresholds) - 1):
                             if rsrp_thresholds[i] >= value > rsrp_thresholds[i + 1]:
                                 color_interpolated = colors[i]
-                                opacity_interpolated = 0.4
+                                opacity_interpolated = 1
                     colors_interpolated.append(color_interpolated)
                     opacities_interpolated.append(opacity_interpolated)
 ###############################################################
@@ -662,9 +383,10 @@ def update_charts(selected_file, selected_method, selected_interpolation_data, s
             scatter_mapbox_trace_rsrp = go.Scattermapbox(
                 lat=meas_df['latitude'],
                 lon=meas_df['longitude'],
-                mode='markers+lines',
+                #mode='markers+lines',
+                mode='markers',
                 marker=dict(size=10, symbol="circle", color=meas_df['color_rsrp'], opacity=1, colorscale='Viridis'),
-                line=dict(width=2, color='grey'),
+                #line=dict(width=2, color='grey'),
                 text=meas_df['text'],
                 hoverinfo='text',
                 name='Measured RSRP Points'
@@ -726,7 +448,7 @@ def update_charts(selected_file, selected_method, selected_interpolation_data, s
                     lat=grid_x.flatten(),
                     lon=grid_y.flatten(),
                     mode='markers',
-                    marker=dict(size=10, color=colors_interpolated, opacity=opacities_interpolated, colorscale='Viridis'),
+                    marker=dict(size=10, color=colors_interpolated, opacity=opacities_interpolated),
                     hoverinfo='none',
                     #text=grid_z.flatten(),
                     selectedpoints=[],  # Disable click actions on these points
@@ -1016,140 +738,22 @@ def update_selectors_options(selected_file):
         # If no data are selected, return empty options for other selectors
         return [], [], [], [], []
 ###############################################################
-# Callback function that takes inputs from the input boxes and returns the output
+# Define a callback to update options when the dropdown is clicked
 @app.callback(
-    [Output('out-measurement-name', 'children'),
-     Output('out-measurement-duration', 'children')],
-    [Input('measurement-name', 'value'),
-     Input('measurement-duration', 'value')]
+    Output('data-selector', 'options'),
+    [Input('data-selector', 'value')]
 )
-def update_output(meas_name, meas_duration):
-    # Perform some function with the input values
-    # result_meas_name = f' Measurement file name: {meas_name}.csv'
-    # result_meas_duration = f' Measurement duration: {meas_duration} s'
-    result_meas_name = None
-    result_meas_duration = None
-    return result_meas_name, result_meas_duration
-###############################################################
-# # Callback function that takes input from the button click
-# @app.callback(
-#     [Output('output', 'children'),
-#      Output('button', 'style'),
-#      Output('button', 'children')],
-#     [Input('button', 'n_clicks')],
-#     [State('button', 'children')]
-# )
-# def update_output(n_clicks, button_text):
-#     if n_clicks is None:
-#         return None, dash.no_update, dash.no_update
-    
-#     if n_clicks % 2 == 1:
-#         print('Start')
-#     else:
-#         print('Stop')
-#     if button_text == 'Start':
-#         button_style = {'backgroundColor': 'red', 'width': '150px', 'height': '50px'}
-#         new_text = 'Stop'
-#     else:
-#         button_style = {'backgroundColor': 'green', 'width': '150px', 'height': '50px'}
-#         new_text = 'Start'
-
-#     # Perform some function
-#     result = None
-#     return result, button_style, new_text
-# Callback function that takes input from the button click
-@app.callback(
-    [Output('output', 'children'),
-     Output('button', 'style'),
-     Output('button', 'children'),
-     Output('result-store', 'data')],
-    [Input('button', 'n_clicks'),
-     Input('result-store', 'data')],
-    [State('button', 'children')]
-)
-def update_output(n_clicks, stored_result, button_text):
-    global button_state
-
-    if n_clicks is None:
-        return None, dash.no_update, dash.no_update, None
-    
-    if n_clicks % 2 == 1:
-        print('Start')
-        button_style = {'backgroundColor': 'red', 'width': '150px', 'height': '50px'}
-        new_text = 'Stop'
-        button_state = True
-        # Start the background function in a separate thread when the button is clicked
-        background_thread = threading.Thread(target=background_function, args=(stored_result,))
-        background_thread.daemon = True
-        background_thread.start()
-    else:
-        print('Stop')
-        button_style = {'backgroundColor': 'green', 'width': '150px', 'height': '50px'}
-        new_text = 'Start'
-        button_state = False
-
-    # if button_text == 'Start':
-    #     button_style = {'backgroundColor': 'red', 'width': '150px', 'height': '50px'}
-    #     new_text = 'Stop'
-    # else:
-    #     button_style = {'backgroundColor': 'green', 'width': '150px', 'height': '50px'}
-    #     new_text = 'Start'
-
-    return stored_result['result'] if stored_result else None, button_style, new_text, None
-###############################################################
-@app.callback(
-    [Output('my-slider', 'min'),
-     Output('my-slider', 'max'),
-     Output('my-slider', 'step'),
-     Output('my-slider', 'value'),
-     Output('my-slider', 'marks'),
-     Output('my-slider', 'disabled')],
-    [Input('measurement-type', 'value')]
-)
-def update_slider(unit):
-    if unit == 'SECONDS':
-        return 1, 100, 1, 1, {i: f'{i}' for i in range(0, 100, 5)}, False
-    elif unit == 'METERS':
-        return 10, 500, 10, 10, {i: f'{i}' for i in range(0, 500, 50)}, False
-    else:
-        return 1, 100, 1, 1, {i: f'{i}' for i in range(0, 100, 5)}, True  # Disable slider if no unit is selected
-###############################################################
-@app.callback(
-    Output('slider-output', 'children'),
-    [Input('my-slider', 'value'),
-     Input('my-slider', 'disabled')]
-)
-def update_output(value, functional):
-    if not functional:
-        return f'{value}'
-    else:
-        return None
-###############################################################
-@app.callback(
-    [Output('measurement-band', 'options'),
-     Output('measurement-band', 'disabled')],
-    [Input('measurement-technology', 'value')]
-)
-def update_bands(technology):
-    selected = ''
-    if technology != None:
-        for rat in technology:
-            if rat == '4G':
-                selected += '4G'
-            if rat == '5G':
-                selected += '5G'
-        if selected == '4G':
-            return bands_czech_republic_4g, False
-        elif selected == '5G':
-            return bands_czech_republic_5g, False
-        elif selected == '4G5G' or selected == '5G4G':
-            bands_czech_republic_4_and_5g = bands_czech_republic_4g + bands_czech_republic_5g
-            return bands_czech_republic_4_and_5g, False
-        else:
-            return [], True  # Disable dropdown menu if no technology is selected
-    else:
-        return [], True  # Disable dropdown menu if no technology is selected
-###############################################################
+def update_options(n_clicks):
+    # Add your logic to update options based on the click event
+    # For example, you can update the options list with new data
+    updated_options = [
+        {'label': f'Data Set: {file_name}', 'value': file_path}
+        for file_name, file_path in zip(
+            [os.path.basename(file_path) for file_path in glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv')],
+            glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv')
+        )
+    ]
+    return updated_options
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)

@@ -2,4 +2,6 @@ dash==2.14.0
 pandas==2.1.2
 matplotlib==3.8.1
 scipy==1.11.3
-
+pyserial==3.5
+diskcache==5.6.3
+celery==5.3.6
