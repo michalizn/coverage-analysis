@@ -9,6 +9,7 @@ import dash
 from dash import Dash, DiskcacheManager, CeleryManager, Input, Output, State, html, callback, dcc
 from dash.exceptions import PreventUpdate
 from math import radians, sin, cos, sqrt, atan2
+import plotly.graph_objects as go
 
 if 'REDIS_URL' in os.environ:
     # Use Redis & Celery if REDIS_URL set as an env variable
@@ -157,6 +158,17 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     [
+                        dcc.Checklist(
+                            id='checkbox',
+                            options=[
+                                {'label': 'Turn off GPS localization', 'value': 'GPS_off'}
+                            ],
+                        )
+                    ],
+                    style={'width': '100%', 'margin-bottom': '10px'},
+                ),
+                html.Div(
+                    [
                         html.Label('Start the measurement:'),
                         html.Button(
                             id='button_id',
@@ -188,7 +200,6 @@ app.layout = html.Div(
                             style={
                                 'visibility': 'hidden',
                                 'width': '100%',
-
                             },
                         ),
                         html.P(id="output_console_time", children=[""]),
@@ -253,7 +264,7 @@ def enable_button(duration):
     except (TypeError, ValueError):
         # If conversion fails, return True (button disabled)
         return True, True
-    
+
 @callback(
     output=Output("paragraph_id", "children"),
     inputs=[Input("button_id", "n_clicks"),
@@ -262,7 +273,8 @@ def enable_button(duration):
             State("measurement-technology", "value"),
             #State("sample-freq", "value"),
             #State("measurement-unit", "value"),
-            State("measurement-band", "value")],
+            State("measurement-band", "value"),
+            State("checkbox", "value")],
     background=True,
     running=[
         (Output("button_id", "disabled"), True, False),
@@ -307,22 +319,20 @@ def enable_button(duration):
               Output("output_console_5g", "children")],
     prevent_initial_call=True
 )
-def update_progress(set_progress, n_clicks, name, duration, technology, band):
+def update_progress(set_progress, n_clicks, name, duration, technology, band, gps):
     if int(duration) > 0:
-        TEST = False
-        STAT = False
-        meas_counter = 1
-
+        print(gps)
+        if gps == None:
+            gps = []
         set_progress((str(int(0)), str(int(duration)), f'Start of a Measurement', f'', f'', f'', f'', 
-                                                                  f'', f'', f'', f'', f'',
-                                                                  f'', f''))
+                                                                f'', f'', f'', f'', f'',
+                                                                f'', f''))
 
         meas_data_path = r'/home/baranekm/Documents/Python/5G_module/measured_data'
 
         # Prepared commands
         init_commands = ["ATI\r\n", "ATE1\r\n", "AT+CFUN=1\r\n"]
         meas_commands = ["AT+CCLK?\r\n", "AT+COPS?\r\n", "AT+CSQ\r\n", "AT+CPSI?\r\n", "AT+CGPSINFO\r\n"]
-        end_commands = ["AT+CGPS=0\r\n"]
 
         ports_to_test = ['/dev/ttyUSB2', '/dev/ttyUSB3']
 
@@ -361,13 +371,13 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band):
         # Check if the ports are open
         if serial_port_AT.is_open:
             set_progress((str(int(0)), str(int(duration)), f'Serial port opened successfully.', f'', f'', f'', f'', 
-                                                                  f'', f'', f'', f'', f'',
-                                                                  f'', f''))
+                                                                f'', f'', f'', f'', f'',
+                                                                f'', f''))
             print("Serial port opened successfully.")
         else:
             set_progress((str(int(0)), str(int(duration)), f'Failed to open serial port.', f'', f'', f'', f'', 
-                                                                  f'', f'', f'', f'', f'',
-                                                                  f'', f''))
+                                                                f'', f'', f'', f'', f'',
+                                                                f'', f''))
             print("Failed to open serial port.")
 
         # Clear any existing data in the serial buffer
@@ -384,33 +394,38 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band):
                 # Read the response
                 response = serial_port_AT.read_all().decode()
                 set_progress((str(int(0)), str(int(duration)), f'Writing init commands:', f'{response}', f'', f'', f'', 
-                                                                  f'', f'', f'', f'', f'',
-                                                                  f'', f''))
-                print("Response:\r\n", response)
-                print("\r\n")
-
-            # Is GPS ON or OFF? (Start GPS)
-            serial_port_AT.write("AT+CGPS?\r\n".encode())
-            # Wait for 2s
-            time.sleep(2)
-            # Read the response
-            response = serial_port_AT.read_all().decode().replace("\r", "").replace("\n", "").replace("OK", "")
-            if '0' in response:
-                serial_port_AT.write("AT+CGPS=1\r\n".encode())
-                time.sleep(0.5)
-                print(serial_port_AT.read_all().decode())
-
-                print("Wait for 60s")
-                # Set the start time
-                wait_start_time = time.time()
-
-                # Loop to print elapsed time every second
-                while (time.time() - wait_start_time) < 60:
-                    elapsed_time = 60 - (time.time() - wait_start_time)
-                    set_progress((str(int(0)), str(int(duration)), f'Wait 60s for GPS cold start.', f'{int(elapsed_time)} seconds remaining', f'', f'', f'', 
                                                                 f'', f'', f'', f'', f'',
                                                                 f'', f''))
-                    time.sleep(1)  # Wait for 1 second before printing again
+                print("Response:\r\n", response)
+                print("\r\n")
+            
+            if 'GPS_off' in gps:
+                set_progress((str(int(0)), str(int(duration)), f'GPS localiaztion turned off.', f'', f'', f'', f'', 
+                                                                    f'', f'', f'', f'', f'',
+                                                                    f'', f''))
+            else:
+                # Is GPS ON or OFF? (Start GPS)
+                serial_port_AT.write("AT+CGPS?\r\n".encode())
+                # Wait for 2s
+                time.sleep(2)
+                # Read the response
+                response = serial_port_AT.read_all().decode().replace("\r", "").replace("\n", "").replace("OK", "")
+                if '0' in response:
+                    serial_port_AT.write("AT+CGPS=1\r\n".encode())
+                    time.sleep(0.5)
+                    print(serial_port_AT.read_all().decode())
+
+                    print("Wait for 60s")
+                    # Set the start time
+                    wait_start_time = time.time()
+
+                    # Loop to print elapsed time every second
+                    while (time.time() - wait_start_time) < 60:
+                        elapsed_time = 60 - (time.time() - wait_start_time)
+                        set_progress((str(int(0)), str(int(duration)), f'Wait 60s for GPS cold start.', f'{int(elapsed_time)} seconds remaining', f'', f'', f'', 
+                                                                    f'', f'', f'', f'', f'',
+                                                                    f'', f''))
+                        time.sleep(1)  # Wait for 1 second before printing again
 
             serial_port_AT.close()
 
@@ -432,29 +447,14 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band):
             # Get the starting time
             start_time = time.time()
 
-            #gps_data = []
-            time_msg = f'Measurement file'
-            rat_msg = f'{meas_file_name}'
-            band_msg = f'created!'
-            dl_bw_msg = f''
-            ul_bw_msg = f''
-            rsrp_msg = f''
-            rsrq_msg = f''
-            rssi_msg = f''
-            rssnr_msg = f''
-            lat_msg = f''
-            lon_msg = f''
-            msg5g = f''
+            set_progress((str(int(0)), str(int(duration)), f'Measurement file', f'{meas_file_name}', f'created!', f'', f'', 
+                                                                    f'', f'', f'', f'', f'',
+                                                                    f'', f''))
 
             meas_timer = 0
 
             # Run the loop for the specified duration
             while (time.time() - start_time) < int(duration):
-                #set_progress((str(meas_counter), str(int(duration)/int(sample_freq)), [msg]))
-                set_progress((str(int(meas_timer)), str(int(duration)), time_msg, rat_msg, band_msg, dl_bw_msg, ul_bw_msg, 
-                                                                        rsrp_msg, rsrq_msg, rssi_msg, rssnr_msg, lat_msg,
-                                                                        lon_msg, msg5g))
-
                 temp_data = []
                 try:
                     for port in ports_to_test:
@@ -490,22 +490,26 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band):
                                     serial_port_AT.reset_input_buffer()
                                     break
                         else:
-                            # Get the starting time
-                            gps_start_time = time.time()
-                            max_wait_gps_time = 3
-                            while True:
-                                # Read the response
-                                response = serial_port_AT.read_all().decode()
-                                # When there is full message of GPS, get out
-                                if "+CGPSINFO:" in response:
-                                    break
-                                if (time.time() - gps_start_time) > max_wait_gps_time:
-                                    print("GPS error!")
-                                    response = "GPSNONE"
-                                    # Clear any existing data in the serial buffer
-                                    print("Clearing input buffers")
-                                    serial_port_AT.reset_input_buffer()
-                                    break
+                            if 'GPS_off' in gps:
+                                print('GPS is off.')
+                                response = "GPSNONE"
+                            else:
+                                # Get the starting time
+                                gps_start_time = time.time()
+                                max_wait_gps_time = 3
+                                while True:
+                                    # Read the response
+                                    response = serial_port_AT.read_all().decode()
+                                    # When there is full message of GPS, get out
+                                    if "+CGPSINFO:" in response:
+                                        break
+                                    if (time.time() - gps_start_time) > max_wait_gps_time:
+                                        print("GPS error!")
+                                        response = "GPSNONE"
+                                        # Clear any existing data in the serial buffer
+                                        print("Clearing input buffers")
+                                        serial_port_AT.reset_input_buffer()
+                                        break
                         if "CCLK" in response and command_index == 0:
                             response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+CCLK?+CCLK: ", "").replace(".0", "")
                             response = response.split(',')
@@ -567,16 +571,19 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band):
                             msg5g = f'NO 5G DATA'
                             lat_msg = f'LAT: {temp_data[18]}'
                             lon_msg = f'LON: {temp_data[20]}'
-                        #msg = f'Succesful measurement: TIME: {temp_data[0]} - {temp_data[1]} \n\r Operator: {temp_data[2]}'
-                meas_counter += 1
                 meas_timer = (time.time() - start_time)
+
+                set_progress((str(int(meas_timer)), str(int(duration)), time_msg, rat_msg, band_msg, dl_bw_msg, ul_bw_msg, 
+                                                                        rsrp_msg, rsrq_msg, rssi_msg, rssnr_msg, lat_msg,
+                                                                        lon_msg, msg5g))
+                
                 # Close the serial port
                 serial_port_AT.close()
 
         set_progress((str(int(duration)), str(int(duration)), f'', f'', f'', f'', f'', 
-                                                                  f'', f'', f'', f'', f'',
-                                                                  f'', f''))
-        
+                                                                f'', f'', f'', f'', f'',
+                                                                f'', f''))
+
     return f""
 
 if __name__ == "__main__":
