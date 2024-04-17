@@ -7,10 +7,10 @@
    git clone https://github.com/michalizn/coverage-analysis
    ```
 2. Create a new Python environment:
-  ```bash
-  python3 -m venv env
-  ```
+   ```bash
+   python3 -m venv env
+   ```
 3. Install the required packages:
-  ```
-  pip3 install -r environment/requirements.txt
-  ```
+   ```bash
+   pip3 install -r environment/requirements.txt
+   ```
