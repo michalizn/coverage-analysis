@@ -25,8 +25,8 @@ from matplotlib import colors as mpl_colors
 
 dash.register_page(__name__, path='/')
 
-# Define the directory where your .txt files are located
-data_directory = r'/home/baranekm/Documents/Python/5G_module/new_app/data/measured_data/static'
+script_dir = os.path.dirname(__file__).replace('pages', '')
+data_directory = os.path.join(script_dir, 'data', 'measured_data', 'static')
 
 layout = html.Div([
         dbc.Container([
@@ -45,7 +45,8 @@ layout = html.Div([
                                                         id='data-selector-static',
                                                         options=[
                                                                 {'label': f'Data Set: {file_name}', 'value': file_path}
-                                                                for file_name, file_path in zip([os.path.basename(file_path) for file_path in glob.glob(r'/home/baranekm/Documents/Python/5G_module/new_app/data/measured_data/static/*.csv')], glob.glob(r'/home/baranekm/Documents/Python/5G_module/new_app/data/measured_data/static/*.csv'))
+                                                                for file_name, file_path in zip([os.path.basename(file_path) for file_path in glob.glob(os.path.join(data_directory, '*.csv'))],
+                                                                                                 glob.glob(os.path.join(data_directory, '*.csv')))
                                                         ],
                                                         multi=True,
                                                         clearable=True,

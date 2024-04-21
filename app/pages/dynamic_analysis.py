@@ -89,7 +89,8 @@ def map_column_to_color(df, column_name):
 
     df[f'color_{column_name}'] = df[column_name].apply(map_value_to_color)
 # Initialize dataframe of Cells
-bts_df = pd.read_csv(r'/home/baranekm/Documents/Python/5G_module/new_app/data/cell_database/bts_list.csv', delimiter=';')
+script_dir = os.path.dirname(__file__).replace('pages', '')
+bts_df = pd.read_csv(os.path.join(script_dir, 'data', 'cell_database', 'bts_list.csv'), delimiter=';')
 # Formating to display multiple columns in the text while hovering over the points in the map
 bts_df['text'] = 'Node place: ' + bts_df['bts_place'].astype(str) + '<br>' + \
                  'Latitude: ' + bts_df['bts_lat'].astype(str) + '<br>' + \
@@ -100,7 +101,7 @@ bts_df['hex'] = bts_df['hex'].str.replace(r'\D', '', regex=True)
 # Convert 'hex' column to numeric, coerce non-numeric values to NaN
 bts_df['hex'] = pd.to_numeric(bts_df['hex'], errors='coerce')
 # Define the directory where your .txt files are located
-data_directory = r'/home/baranekm/Documents/Python/5G_module/new_app/data/measured_data/dynamic'
+data_directory = os.path.join(script_dir, 'data', 'measured_data', 'dynamic')
 # Initialize a State variable to store the previous selected file and method
 prev_selected_file = None
 prev_selected_file_2 = None
@@ -159,7 +160,8 @@ layout = html.Div([
                                                         id='data-selector',
                                                         options=[
                                                                 {'label': f'Data Set: {file_name}', 'value': file_path}
-                                                                for file_name, file_path in zip([os.path.basename(file_path) for file_path in glob.glob(r'/home/baranekm/Documents/Python/5G_module/new_app/data/measured_data/dynamic/*.csv')], glob.glob(r'/home/baranekm/Documents/Python/5G_module/new_app/data/measured_data/dynamic/*.csv'))
+                                                                for file_name, file_path in zip([os.path.basename(file_path) for file_path in glob.glob(os.path.join(data_directory, '*.csv'))],
+                                                                                                 glob.glob(os.path.join(data_directory, '*.csv')))
                                                         ],
                                                         multi=True,
                                                         clearable=True,
@@ -846,8 +848,8 @@ def update_options(n_clicks):
     updated_options = [
         {'label': f'Data Set: {file_name}', 'value': file_path}
         for file_name, file_path in zip(
-            [os.path.basename(file_path) for file_path in glob.glob(r'/home/baranekm/Documents/Python/5G_module/new_app/data/measured_data/dynamic/*.csv')],
-            glob.glob(r'/home/baranekm/Documents/Python/5G_module/new_app/data/measured_data/dynamic/*.csv')
+            [os.path.basename(file_path) for file_path in glob.glob(os.path.join(data_directory, '*.csv'))],
+            glob.glob(os.path.join(data_directory, '*.csv'))
         )
     ]
     return updated_options

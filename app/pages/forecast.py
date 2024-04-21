@@ -25,6 +25,8 @@ from matplotlib import colors as mpl_colors
 
 dash.register_page(__name__, path='/')
 
+script_dir = os.path.dirname(__file__).replace('pages', '')
+data_directory = os.path.join(script_dir, 'data', 'measured_data', 'static')
 """
 - Settings part
         - Select from witch metric will forecast be
@@ -57,10 +59,11 @@ layout = html.Div([
                                         dbc.CardBody([
                                                 html.Label('Select the data for proccesing:', style={'fontSize':30, 'textAlign':'center'}),
                                                 dcc.Dropdown(
-                                                        id='data-selector',
+                                                        id='data-selector-forecast',
                                                         options=[
                                                                 {'label': f'Data Set: {file_name}', 'value': file_path}
-                                                                for file_name, file_path in zip([os.path.basename(file_path) for file_path in glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv')], glob.glob(r'/home/baranekm/Documents/Python/5G_module/measured_data/*.csv'))
+                                                                for file_name, file_path in zip([os.path.basename(file_path) for file_path in glob.glob(os.path.join(data_directory, '*.csv'))],
+                                                                                                 glob.glob(os.path.join(data_directory, '*.csv')))
                                                         ],
                                                         multi=True,
                                                         clearable=True,
