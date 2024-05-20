@@ -117,35 +117,6 @@ app.layout = html.Div(
                     ],
                     style={'width': '100%', 'margin-bottom': '10px'},
                 ),
-                # html.Div(
-                #     [
-                #         html.Label('Measurement Sample Frequency:'),
-                #         dcc.Slider(
-                #             id='sample-freq',
-                #             min=1,
-                #             max=100,
-                #             step=1,
-                #             value=1,
-                #             marks={i: f'{i}' for i in range(0, 100, 5)},
-                #             persistence=True,
-                #         ),
-                #     ],
-                #     style={'width': '100%', 'margin-bottom': '10px'},
-                # ),
-                # html.Div(
-                #     [
-                #         dcc.Dropdown(
-                #             id='measurement-unit',
-                #             options=[
-                #                 {'label': 'Meters', 'value': 'METERS'},
-                #                 {'label': 'Seconds', 'value': 'SECONDS'},
-                #             ],
-                #             placeholder="Select sampling unit Meters/Seconds",
-                #             persistence=True,
-                #         ),
-                #     ],
-                #     style={'width': '100%', 'margin-bottom': '10px'},
-                # ),
                 html.Div(
                     [
                         dcc.Dropdown(
@@ -271,8 +242,6 @@ def enable_button(duration):
             State("measurement-name", "value"),
             State("measurement-duration", "value"),
             State("measurement-technology", "value"),
-            #State("sample-freq", "value"),
-            #State("measurement-unit", "value"),
             State("measurement-band", "value"),
             State("checkbox", "value")],
     background=True,
@@ -498,18 +467,21 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band, gp
                                 gps_start_time = time.time()
                                 max_wait_gps_time = 3
                                 while True:
-                                    # Read the response
-                                    response = serial_port_AT.read_all().decode()
-                                    # When there is full message of GPS, get out
-                                    if "+CGPSINFO:" in response:
-                                        break
-                                    if (time.time() - gps_start_time) > max_wait_gps_time:
-                                        print("GPS error!")
-                                        response = "GPSNONE"
-                                        # Clear any existing data in the serial buffer
-                                        print("Clearing input buffers")
-                                        serial_port_AT.reset_input_buffer()
-                                        break
+                                    try:
+                                        # Read the response
+                                        response = serial_port_AT.read_all().decode()
+                                        # When there is full message of GPS, get out
+                                        if "+CGPSINFO:" in response:
+                                            break
+                                        if (time.time() - gps_start_time) > max_wait_gps_time:
+                                            print("GPS error!")
+                                            response = "GPSNONE"
+                                            # Clear any existing data in the serial buffer
+                                            print("Clearing input buffers")
+                                            serial_port_AT.reset_input_buffer()
+                                            break
+                                    except:
+                                        print('Error with GPS checking')
                         if "CCLK" in response and command_index == 0:
                             response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+CCLK?+CCLK: ", "").replace(".0", "")
                             response = response.split(',')
@@ -517,7 +489,7 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band, gp
                                 if "+" in response[i]:
                                     response[i] = response[i][:response[i].find('+')]
                                 temp_data.append(response[i])
-                        if "COPS" in response and command_index == 1:
+                        elif "COPS" in response and command_index == 1:
                             response = response.replace("\r", "").replace("\n", "").replace("\"", "").replace("OK", "").replace("AT+COPS?+COPS: ", "").replace(".0", "")
                             response = response.split(',')
                             temp_data.append(response[2])
@@ -539,16 +511,16 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band, gp
                             response = response.split(',')
                             for i in range(len(response)):
                                 temp_data.append(response[i])
-                        elif "GPSNONE" in response:
-                            response = ',,,,,,,,,'
+                        elif "GPSNONE" in response and command_index == 4:
+                            response = ',,,,,,,,'
                             response = response.split(',')
                             for i in range(len(response)):
                                 temp_data.append(response[i])
                         else:
                             response = None
                     except:
-                        print("Something")
-                        time.sleep(1)
+                        print("Something went wrong in main loop")
+
                 if response != None:
                     with open(data_path, 'a', newline='') as data:
                         csv_writer = csv.writer(data)
@@ -576,7 +548,7 @@ def update_progress(set_progress, n_clicks, name, duration, technology, band, gp
                 set_progress((str(int(meas_timer)), str(int(duration)), time_msg, rat_msg, band_msg, dl_bw_msg, ul_bw_msg, 
                                                                         rsrp_msg, rsrq_msg, rssi_msg, rssnr_msg, lat_msg,
                                                                         lon_msg, msg5g))
-                
+
                 # Close the serial port
                 serial_port_AT.close()
 

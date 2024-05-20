@@ -1,0 +1,5 @@
+plotly==3.10.0
+dash==2.5.1
+gunicorn==20.0.4
+pandas==1.1.4
+requests

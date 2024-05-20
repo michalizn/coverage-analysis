@@ -3,7 +3,7 @@ from dash.dependencies import Input, Output
 # Connect to main app.py file
 from app import app
 # Connect to app pages
-from pages import dynamic_analysis, forecast, static_analysis
+from pages import mobile_analysis, forecast, static_analysis, about
 # Connect the navbar to the index
 from components import navbar
 # Make a server
@@ -20,14 +20,16 @@ app.layout = html.Div([
 @app.callback(Output('page-content', 'children'),
               [Input('url', 'pathname')])
 def display_page(pathname):
-    if pathname == '/dynamic_analysis':
-        return dynamic_analysis.layout
-    if pathname == '/forecast':
-        return forecast.layout
+    if pathname == '/mobile_analysis':
+        return mobile_analysis.layout
+    # if pathname == '/forecast':
+    #     return forecast.layout
     if pathname == '/static_analysis':
         return static_analysis.layout
+    if pathname == '/about':
+        return about.layout
     else:
-        return dynamic_analysis.layout
+        return mobile_analysis.layout
 
 if __name__ == '__main__':
     app.run_server(debug=True)
